@@ -182,7 +182,7 @@ jsplotlib.rc = {
   "lines.color": "blue",
   "lines.marker": "None",
   "lines.markeredgewidth": 0.5,
-  "lines.markersize": 6,
+  "lines.markersize": 5,
   "lines.dash_joinstyle": "miter",
   "lines.dash_capstyle": "butt",
   "lines.solid_jointyle": "miter",
@@ -206,6 +206,14 @@ jsplotlib.rc = {
 };
 
 var chart_counter = 0; // for creating unique ids
+
+var get_chart_id = function() {
+    return "pplotchart" + chart_counter;
+};
+
+var get_clipping_id = function() {
+    return "clipping-" + get_chart_id();
+};
 
 /** Line2D class for encapsulating all line relevant attributes and methods
     Rebuilds partial matplotlib.Line2D functionality. Does not inherit from
@@ -238,11 +246,19 @@ jsplotlib.Line2D = function(xdata, ydata, linewidth, linestyle, color, marker,
   that._pickradius = pickradius || 5;
   that._drawstyle = drawstyle || null;
   that._markevery = markevery || null;
+  that._alpha = 1.0;
+  that._graphtype = null;
+  that._barwidth = 0.8;
+  that._histbins = 10;
+  that._normed = false;
+  that._text = null;
+  that._fontsize = 10;
+
   //kwargs
 
   // if only y provided, create Array from 1 to N
   if (!that._x || that._x.length === 0) {
-    that._x = jsplotlib.linspace(1, that._y.length, that._y.length);
+    that._x = jsplotlib.linspace(0, that._y.length-1, that._y.length);
   }
 
   that.antialiased = function(a) {
@@ -364,6 +380,16 @@ jsplotlib.Line2D = function(xdata, ydata, linewidth, linestyle, color, marker,
     return this;
   };
 
+  that.bar_id = function(bid) {
+    this._bar_id = bid;
+    return this;
+  };
+
+  that.scatter_id = function(sid) {
+    this._scatter_id = sid;
+    return this;
+  };
+
   that.xrange = function(min, max, N) {
     this._x = jsplotlib.linspace(min, max, N);
     return this;
@@ -373,6 +399,36 @@ jsplotlib.Line2D = function(xdata, ydata, linewidth, linestyle, color, marker,
     this._y = jsplotlib.linspace(min, max, N);
     return this;
   };
+
+  that.graphtype = function(gt) {
+    this._graphtype = gt;
+    return this;
+  };
+
+  that.barwidth = function(bw) {
+    this._barwidth = bw;
+    return this;
+  };
+
+  that.histbins = function(bins) {
+    this._histbins = bins;
+    return this;
+  };
+
+  that.normed = function(n) {
+    this._normed = n;
+    return this;
+  };
+
+  that.text = function(t) {
+    this._text = t;
+    return this;
+  }
+
+  that.fontsize = function(s) {
+    this._fontsize = s;
+    return this;
+  }
 
   /**
     Updates possible attributes provided as kwargs
@@ -442,6 +498,27 @@ jsplotlib.Line2D = function(xdata, ydata, linewidth, linestyle, color, marker,
               break;
             case 'markevery':
               this.markevery(val);
+              break;
+            case 'alpha':
+              this.alpha(val);
+              break;
+            case 'graphtype':
+              this.graphtype(val);
+              break;
+            case 'barwidth':
+              this.barwidth(val);
+              break;
+            case 'histbins':
+              this.histbins(val);
+              break;
+            case 'normed':
+              this.normed(val);
+              break;
+            case 'text':
+              this.text(val);
+              break;
+            case 'fontsize':
+              this.fontsize(val);
               break;
           }
         }
@@ -532,112 +609,164 @@ jsplotlib.Line2D = function(xdata, ydata, linewidth, linestyle, color, marker,
 
       return x;
     };
-
+      
     // those are the default formatters, we just use a precision if its a number
     parent_chart._xaxis._formatter = parent_chart._xaxis._formatter || default_formatter;
 
     parent_chart._yaxis._formatter = parent_chart._yaxis._formatter || default_formatter;
 
-    // this adds the line to the chart
-    this._line = parent_chart.chart.append("svg:g").attr("id", this._line_id);
-    this._line_containers = this._line.selectAll("g.pplot_lines").data(pairs).enter()
-      .append("g").attr("class", "pplot_lines");
+    var get_scatter_id = function(n) {
+        return get_chart_id() + "-scatter" + n;
+    };
 
-    // set appropriate line style
-    if (this._linestyle === "-") {
-      this._lines = this._line_containers.append("line")
-        .attr("x1", function(d) {
-          return xscale(d[0][0]);
-        })
-        .attr("x2", function(d) {
-          return xscale(d[1][0]);
-        })
-        .attr("y1", function(d) {
-          return yscale(d[0][1]);
-        })
-        .attr("y2", function(d) {
-          return yscale(d[1][1]);
-        })
-        .style("stroke", jsplotlib.color_to_hex(this._color))
-        .style("stroke-linecap", this._solid_capstyle)
-        .style("stroke-linejoin", this._solid_joinstyle)
-        .style("stroke-opacity", this._alpha)
-        .style("stroke-width", this._linewidth);
-    } else if (this._linestyle === "--") {
-      this._lines = this._line_containers.append("line")
-        .attr("x1", function(d) {
-          return xscale(d[0][0]);
-        })
-        .attr("x2", function(d) {
-          return xscale(d[1][0]);
-        })
-        .attr("y1", function(d) {
-          return yscale(d[0][1]);
-        })
-        .attr("y2", function(d) {
-          return yscale(d[1][1]);
-        })
+    if (this._graphtype === "scatter") {
+        var s = this._markersize;
+        if (s === undefined || typeof(s) === "number") {
+            var t = (s === undefined ? 1.0 : s);             // default scatter width 1.0
+            s = new Array(y.length);
+            for (var i = 0; i < s.length; i++)
+                s[i] = t;
+        }
+        var xys = d3.zip(x, y, s);
+        this._scatter = parent_chart.chart.append("svg:g").attr("id", get_scatter_id(this._scatter_id))
+            .attr("class", "pplot_scatters")
+            .style("clip-path", "url(#" + get_clipping_id() + ")")
+            .style("fill", jsplotlib.color_to_hex(this._color));
+        this._scatters = this._scatter.selectAll("circle.pplot_scatters" + this._scatter_id)
+            .data(xys).enter()
+            .append("circle").attr("class", "pplot_scatters" + this._scatter_id)
+            .attr("cx", function(d) { return xscale(d[0]); })
+            .attr("cy", function(d) { return yscale(d[1]); })
+            .attr("r", function(d) { return Math.sqrt(Math.abs(d[2])/3.1416); })
+            .style("opacity", this._alpha);
+        return this;
+    }
+
+    var get_bars_id = function(n) {
+        return get_chart_id() + "-bars" + n;
+    };
+
+    var x_edge_align = function(d) {
+        return xscale(d[0] + (d[2] < 0 ? d[2] : 0));
+    };
+    var x_center_align = function(d) {
+        return xscale(d[0] + (d[2] < 0 ? d[2] : -d[2])/2);
+    };
+    var x_pos_align = (this._drawstyle == "center" ? x_center_align : x_edge_align);
+
+    // this adds the bars to the chart
+    if (this._graphtype === "bar") {
+        var s = this._barwidth;
+        if (s === undefined || typeof(s) === "number") {
+            var t = (s === undefined ? 0.8 : s);             // default bar width 0.8
+            s = new Array(y.length);
+            for (var i = 0; i < s.length; i++)
+                s[i] = t;
+        }
+        var xys = d3.zip(x, y, s);
+        this._bar = parent_chart.chart.append("svg:g").attr("id", get_bars_id(this._bar_id))
+            .attr("class", "pplot_bars")
+            .style("clip-path", "url(#" + get_clipping_id() + ")")
+            .style("stroke", jsplotlib.color_to_hex(this._markeredgecolor))
+            .style("stroke-width", this._markeredgewidth)
+            .style("opacity", this._alpha);
+        this._bars = this._bar.selectAll("rect.pplot_bars" + this._bar_id)
+            .data(xys).enter()
+            .append("rect").attr("class", "pplot_bars" + this._bar_id)
+            .style("fill", jsplotlib.color_to_hex(this._color))
+            .attr("x", x_pos_align)
+            .attr("y", function(d) { return yscale(d[1] > 0 ? d[1] : 0); })
+            .attr("width", function(d) { return Math.abs(xscale(d[2])-xscale(0)); })
+            .attr("height", function(d) { return Math.abs(yscale(d[1] > 0 ? d[1] : -d[1])-yscale(0)); });
+        return this;
+    }
+
+    var get_text_id = function(n) {
+        return get_chart_id() + "-text" + n;
+    };
+
+    if (this._graphtype === "text") {
+        var xys = d3.zip(x, y, this._text);
+        this._text = parent_chart.chart.append("svg:g").attr("id", get_text_id(this._text_id))
+            .attr("class", "pplot_texts")
+            .style("clip-path", "url(#" + get_clipping_id() + ")")
+            .style("font-size", this._fontsize + "pt")
+            .style("fill", jsplotlib.color_to_hex(this._color))
+            .style("opacity", this._alpha);
+        this._texts = this._text.selectAll("text.pplot_texts" + this._text_id)
+            .data(xys).enter()
+            .append("text").attr("class", "pplot_texts" + this._text_id)
+            .attr("x", function(d) { return xscale(d[0]); })
+            .attr("y", function(d) { return yscale(d[1]); })
+            .text(function(d) { return d[2]; });
+        return this;
+    }
+
+    var get_lines_id = function(n) {
+        return get_chart_id() + "-lines" + n;
+    }
+
+    // this adds the line to the chart
+    this._line = parent_chart.chart.append("svg:g").attr("id", get_lines_id(this._line_id))
+        .attr("class", "pplot_lines")
+        .style("clip-path", "url(#" + get_clipping_id() + ")")
         .style("stroke", jsplotlib.color_to_hex(this._color))
         .style("stroke-width", this._linewidth)
+        .style("stroke-opacity", this._alpha);
+
+    var drawlines = true;
+    // set appropriate line style
+    if (this._linestyle === "-" || this._linestyle === null) {
+      this._line = this._line
+        .style("stroke-linecap", this._solid_capstyle)
+        .style("stroke-linejoin", this._solid_joinstyle);
+    } else if (this._linestyle === "--") {
+      this._line = this._line
         .style("stroke-linecap", this._dash_capstyle)
         .style("stroke-linejoin", this._dash_joinstyle)
-        .style("stroke-opacity", this._alpha)
         .style("stroke-dasharray", "5,5");
     } else if (this._linestyle === ":") {
-      this._lines = this._line_containers.append("line")
-        .attr("x1", function(d) {
-          return xscale(d[0][0]);
-        })
-        .attr("x2", function(d) {
-          return xscale(d[1][0]);
-        })
-        .attr("y1", function(d) {
-          return yscale(d[0][1]);
-        })
-        .attr("y2", function(d) {
-          return yscale(d[1][1]);
-        })
-        .style("stroke", jsplotlib.color_to_hex(this._color))
-        .style("stroke-width", this._linewidth)
-        .style("stroke-dasharray", "2,5")
+      this._line = this._line
+        .style("stroke-linecap", "round")
         .style("stroke-linejoin", this._dash_joinstyle)
-        .style("stroke-opacity", this._alpha)
-        .style("stroke-linecap", "round");
+        .style("stroke-dasharray", "2,5");
     } else if (this._linestyle === "-.") {
-      this._lines = this._line_containers.append("line")
-        .attr("x1", function(d) {
-          return xscale(d[0][0]);
-        })
-        .attr("x2", function(d) {
-          return xscale(d[1][0]);
-        })
-        .attr("y1", function(d) {
-          return yscale(d[0][1]);
-        })
-        .attr("y2", function(d) {
-          return yscale(d[1][1]);
-        })
-        .style("stroke", jsplotlib.color_to_hex(this._color))
-        .style("stroke-width", this._linewidth)
+      this._line = this._line
         .style("stroke-linecap", this._dash_capstyle)
         .style("stroke-linejoin", this._dash_joinstyle)
-        .style("stroke-opacity", this._alpha)
         .style("stroke-dasharray", "5, 5, 2, 5");
+    } else {
+        drawlines = false;
+    }
+
+    if (drawlines) {
+        this._lines = this._line.selectAll("line.pplot_lines" + this._line_id)
+            .data(pairs).enter()
+            .append("line").attr("class", "pplot_lines" + this._line_id)
+            .attr("x1", function(d) { return xscale(d[0][0]); })
+            .attr("x2", function(d) { return xscale(d[1][0]); })
+            .attr("y1", function(d) { return yscale(d[0][1]); })
+            .attr("y2", function(d) { return yscale(d[1][1]); });
+    }
+      
+    var get_points_id = function(n) {
+        return get_chart_id() + "-points" + n;
     }
 
     // append points
-    this._points = parent_chart.chart.selectAll("g.pplot_points" + this._line_id)
-      .data(xys).enter().append("g")
-      .attr("x", function(d) {
-        return d[0];
-      })
-      .attr("y", function(d) {
-        return d[1];
-      })
-    //.attr("s", function(d) {
-    //  return d[2];
-    //})
-    .attr("class", "pplot_points" + this._line_id);
+    this._point = parent_chart.chart.append("svg:g").attr("id", get_points_id(this._line_id))
+        .attr("class", "pplot_points")
+        .style("clip-path", "url(#" + get_clipping_id() + ")")
+        .style("stroke", jsplotlib.color_to_hex(this._markeredgecolor))
+        .style("stroke-width", this._markeredgewidth)
+        .style("stroke-opacity", this._alpha)
+        .style("fill", jsplotlib.color_to_hex(this._markerfacecolor));
+
+    this._points = this._point.selectAll("g.pplot_points" + this._line_id)
+      .data(xys).enter()
+      .append("g").attr("class", "pplot_points" + this._line_id)
+      .attr("x", function(d) { return d[0]; })
+      .attr("y", function(d) { return d[1]; });
 
     // init hover popups
     /*
@@ -659,6 +788,22 @@ jsplotlib.Line2D = function(xdata, ydata, linewidth, linestyle, color, marker,
       case " ":
       case "None":
       case "":
+        this._markers = this._points.append("circle").attr("cx", function(d) {
+          return xscale(d[0]);
+        }).attr("cy", function(d) {
+          return yscale(d[1]);
+        }).attr("r", function(d) {
+          return 0;
+        });
+        break;
+      case ",":
+        this._markers = this._points.append("circle").attr("cx", function(d) {
+          return xscale(d[0]);
+        }).attr("cy", function(d) {
+          return yscale(d[1]);
+        }).attr("r", function(d) {
+          return 0.2;
+        });
         break;
       case ".":
         this._markers = this._points.append("circle").attr("cx", function(d) {
@@ -680,23 +825,68 @@ jsplotlib.Line2D = function(xdata, ydata, linewidth, linestyle, color, marker,
         break;
       case "x":
         this._points.append("line").attr("x1", function(d) {
-          return xscale(d[0]) - marker_size;
+          return xscale(d[0]) - marker_size * 0.7;
         }).attr("x2", function(d) {
-          return xscale(d[0]) + marker_size;
+          return xscale(d[0]) + marker_size * 0.7;
         }).attr("y1", function(d) {
-          return yscale(d[1]) - marker_size;
+          return yscale(d[1]) - marker_size * 0.7;
         }).attr("y2", function(d) {
-          return yscale(d[1]) + marker_size;
-        });
+          return yscale(d[1]) + marker_size * 0.7;
+        }).style("stroke", jsplotlib.color_to_hex(this._color));
         this._points.append("line").attr("x1", function(d) {
-          return xscale(d[0]) + marker_size;
+          return xscale(d[0]) + marker_size * 0.7;
         }).attr("x2", function(d) {
+          return xscale(d[0]) - marker_size * 0.7;
+        }).attr("y1", function(d) {
+          return yscale(d[1]) - marker_size * 0.7;
+        }).attr("y2", function(d) {
+          return yscale(d[1]) + marker_size * 0.7;
+        }).style("stroke", jsplotlib.color_to_hex(this._color));
+        this._markers = this._points.selectAll("line");
+        break;
+      case "+":
+        this._points.append("line").attr("x1", function(d) {
           return xscale(d[0]) - marker_size;
+        }).attr("x2", function(d) {
+          return xscale(d[0]) + marker_size;
+        }).attr("y1", function(d) {
+          return yscale(d[1]);
+        }).attr("y2", function(d) {
+          return yscale(d[1]);
+        }).style("stroke", jsplotlib.color_to_hex(this._color));
+        this._points.append("line").attr("x1", function(d) {
+          return xscale(d[0]);
+        }).attr("x2", function(d) {
+          return xscale(d[0]);
         }).attr("y1", function(d) {
           return yscale(d[1]) - marker_size;
         }).attr("y2", function(d) {
           return yscale(d[1]) + marker_size;
-        });
+        }).style("stroke", jsplotlib.color_to_hex(this._color));
+        this._markers = this._points.selectAll("line");
+        break;
+      case "_":
+        this._points.append("line").attr("x1", function(d) {
+          return xscale(d[0]) - marker_size;
+        }).attr("x2", function(d) {
+          return xscale(d[0]) + marker_size;
+        }).attr("y1", function(d) {
+          return yscale(d[1]);
+        }).attr("y2", function(d) {
+          return yscale(d[1]);
+        }).style("stroke", jsplotlib.color_to_hex(this._color));
+        this._markers = this._points.selectAll("line");
+        break;
+      case "|":
+        this._points.append("line").attr("x1", function(d) {
+          return xscale(d[0]);
+        }).attr("x2", function(d) {
+          return xscale(d[0]);
+        }).attr("y1", function(d) {
+          return yscale(d[1]) - marker_size;
+        }).attr("y2", function(d) {
+          return yscale(d[1]) + marker_size;
+        }).style("stroke", jsplotlib.color_to_hex(this._color));
         this._markers = this._points.selectAll("line");
         break;
       case 's':
@@ -714,6 +904,206 @@ jsplotlib.Line2D = function(xdata, ydata, linewidth, linestyle, color, marker,
             return marker_size;
           });
         this._markers = this._points.selectAll("rect");
+        break;
+      case 'D':
+        this._points.append("polygon")
+          .attr("points", function(d) {
+            var cx = xscale(d[0]);
+            var cy = yscale(d[1]);
+            var s  = marker_size * 5 / 4;
+            var plist = [ cx-s, cy,
+                          cx,   cy-s,
+                          cx+s, cy,
+                          cx,   cy+s ];
+            return plist.toString().replace(/,/g," ");
+          });
+        this._markers = this._points.selectAll("polygon");
+        break;
+      case 'd':
+        this._points.append("polygon")
+          .attr("points", function(d) {
+            var cx = xscale(d[0]);
+            var cy = yscale(d[1]);
+            var s  = marker_size * 5 / 4;
+            var plist = [ cx-s/2, cy,
+                          cx,     cy-s,
+                          cx+s/2, cy,
+                          cx,     cy+s ];
+            return plist.toString().replace(/,/g," ");
+          });
+        this._markers = this._points.selectAll("polygon");
+        break;
+      case '^':
+        this._points.append("polygon")
+          .attr("points", function(d) {
+            var cx = xscale(d[0]);
+            var cy = yscale(d[1]);
+            var s  = marker_size * 2;
+            var plist = [ cx-0.5*s, cy+0.289*s,
+                          cx+0.5*s, cy+0.289*s,
+                          cx,       cy-0.577*s ];
+            return plist.toString().replace(/,/g," ");
+          });
+        this._markers = this._points.selectAll("polygon");
+        break;
+      case 'v':
+        this._points.append("polygon")
+          .attr("points", function(d) {
+            var cx = xscale(d[0]);
+            var cy = yscale(d[1]);
+            var s  = marker_size * 2;
+            var plist = [ cx-0.5*s, cy-0.289*s,
+                          cx+0.5*s, cy-0.289*s,
+                          cx,       cy+0.577*s ];
+            return plist.toString().replace(/,/g," ");
+          });
+        this._markers = this._points.selectAll("polygon");
+        break;
+      case '<':
+        this._points.append("polygon")
+          .attr("points", function(d) {
+            var cx = xscale(d[0]);
+            var cy = yscale(d[1]);
+            var s  = marker_size * 2;
+            var plist = [ cx+0.289*s, cy-0.5*s,
+                          cx+0.289*s, cy+0.5*s,
+                          cx-0.577*s, cy ];
+            return plist.toString().replace(/,/g," ");
+          });
+        this._markers = this._points.selectAll("polygon");
+        break;
+      case '>':
+        this._points.append("polygon")
+          .attr("points", function(d) {
+            var cx = xscale(d[0]);
+            var cy = yscale(d[1]);
+            var s  = marker_size * 2;
+            var plist = [ cx-0.289*s, cy-0.5*s,
+                          cx-0.289*s, cy+0.5*s,
+                          cx+0.577*s, cy ];
+            return plist.toString().replace(/,/g," ");
+          });
+        this._markers = this._points.selectAll("polygon");
+        break;
+      case '1':
+        this._points.append("line").attr("x1", function(d) {
+          return xscale(d[0]);
+        }).attr("x2", function(d) {
+          return xscale(d[0]) - marker_size;
+        }).attr("y1", function(d) {
+          return yscale(d[1]);
+        }).attr("y2", function(d) {
+          return yscale(d[1]) - marker_size * 0.577;
+        }).style("stroke", jsplotlib.color_to_hex(this._color));
+        this._points.append("line").attr("x1", function(d) {
+          return xscale(d[0]);
+        }).attr("x2", function(d) {
+          return xscale(d[0]) + marker_size;
+        }).attr("y1", function(d) {
+          return yscale(d[1]);
+        }).attr("y2", function(d) {
+          return yscale(d[1]) - marker_size * 0.577;
+        }).style("stroke", jsplotlib.color_to_hex(this._color));
+        this._points.append("line").attr("x1", function(d) {
+          return xscale(d[0]);
+        }).attr("x2", function(d) {
+          return xscale(d[0]);
+        }).attr("y1", function(d) {
+          return yscale(d[1]);
+        }).attr("y2", function(d) {
+          return yscale(d[1]) + marker_size * 1.155;
+        }).style("stroke", jsplotlib.color_to_hex(this._color));
+        this._markers = this._points.selectAll("line");
+        break;
+      case '2':
+        this._points.append("line").attr("x1", function(d) {
+          return xscale(d[0]);
+        }).attr("x2", function(d) {
+          return xscale(d[0]) - marker_size;
+        }).attr("y1", function(d) {
+          return yscale(d[1]);
+        }).attr("y2", function(d) {
+          return yscale(d[1]) + marker_size * 0.577;
+        }).style("stroke", jsplotlib.color_to_hex(this._color));
+        this._points.append("line").attr("x1", function(d) {
+          return xscale(d[0]);
+        }).attr("x2", function(d) {
+          return xscale(d[0]) + marker_size;
+        }).attr("y1", function(d) {
+          return yscale(d[1]);
+        }).attr("y2", function(d) {
+          return yscale(d[1]) + marker_size * 0.577;
+        }).style("stroke", jsplotlib.color_to_hex(this._color));
+        this._points.append("line").attr("x1", function(d) {
+          return xscale(d[0]);
+        }).attr("x2", function(d) {
+          return xscale(d[0]);
+        }).attr("y1", function(d) {
+          return yscale(d[1]);
+        }).attr("y2", function(d) {
+          return yscale(d[1]) - marker_size * 1.155;
+        }).style("stroke", jsplotlib.color_to_hex(this._color));
+        this._markers = this._points.selectAll("line");
+        break;
+     case '3':
+        this._points.append("line").attr("x1", function(d) {
+          return xscale(d[0]);
+        }).attr("x2", function(d) {
+          return xscale(d[0]) + marker_size * 0.577;
+        }).attr("y1", function(d) {
+          return yscale(d[1]);
+        }).attr("y2", function(d) {
+          return yscale(d[1]) - marker_size;
+        }).style("stroke", jsplotlib.color_to_hex(this._color));
+        this._points.append("line").attr("x1", function(d) {
+          return xscale(d[0]);
+        }).attr("x2", function(d) {
+          return xscale(d[0]) + marker_size * 0.577;
+        }).attr("y1", function(d) {
+          return yscale(d[1]);
+        }).attr("y2", function(d) {
+          return yscale(d[1]) + marker_size;
+        }).style("stroke", jsplotlib.color_to_hex(this._color));
+        this._points.append("line").attr("x1", function(d) {
+          return xscale(d[0]);
+        }).attr("x2", function(d) {
+          return xscale(d[0]) - marker_size * 1.155;
+        }).attr("y1", function(d) {
+          return yscale(d[1]);
+        }).attr("y2", function(d) {
+          return yscale(d[1]);
+        }).style("stroke", jsplotlib.color_to_hex(this._color));
+        this._markers = this._points.selectAll("line");
+        break;
+     case '4':
+        this._points.append("line").attr("x1", function(d) {
+          return xscale(d[0]);
+        }).attr("x2", function(d) {
+          return xscale(d[0]) - marker_size * 0.577;
+        }).attr("y1", function(d) {
+          return yscale(d[1]);
+        }).attr("y2", function(d) {
+          return yscale(d[1]) - marker_size;
+        }).style("stroke", jsplotlib.color_to_hex(this._color));
+        this._points.append("line").attr("x1", function(d) {
+          return xscale(d[0]);
+        }).attr("x2", function(d) {
+          return xscale(d[0]) - marker_size * 0.577;
+        }).attr("y1", function(d) {
+          return yscale(d[1]);
+        }).attr("y2", function(d) {
+          return yscale(d[1]) + marker_size;
+        }).style("stroke", jsplotlib.color_to_hex(this._color));
+        this._points.append("line").attr("x1", function(d) {
+          return xscale(d[0]);
+        }).attr("x2", function(d) {
+          return xscale(d[0]) + marker_size * 1.155;
+        }).attr("y1", function(d) {
+          return yscale(d[1]);
+        }).attr("y2", function(d) {
+          return yscale(d[1]);
+        }).style("stroke", jsplotlib.color_to_hex(this._color));
+        this._markers = this._points.selectAll("line");
         break;
     }
 
@@ -744,10 +1134,6 @@ jsplotlib.Line2D = function(xdata, ydata, linewidth, linestyle, color, marker,
     // add marker attributes
     if (this._markers) {
       this._markers
-        .style("stroke", jsplotlib.color_to_hex(this._markeredgecolor))
-        .style("stroke-width", this._markeredgewidth)
-        .style("stroke-opacity", this._alpha)
-        .style("fill", jsplotlib.color_to_hex(this._markerfacecolor))
         .on("mouseover", resize_function(1.25))
         .on("mouseout", resize_function(0.8));
     }
@@ -776,15 +1162,77 @@ jsplotlib.plot = function(chart) {
   that.axes_colorcycle_position = 0;
   that.line_count = 0;
   that._lines = []; // we support multiple lines
+  that.scatter_count = 0;
+  that._scatters = [];
+  that.bar_count = 0;
+  that._bars = [];
+  that.text_count = 0;
+  that._texts = [];
 
   that.add_line = function(line) {
     if (line) {
       this._lines.push(line);
       line._line_id = this.line_count++;
       this._update_limits();
-      this._update_chart_ratio();
+      //this._update_chart_ratio();
     }
+    return this;
+  };
 
+  that.add_scatter = function(scatter) {
+      if (scatter) {
+          this._scatters.push(scatter);
+          scatter._scatter_id = this.scatter_count++;
+          this._update_limits();
+          //this._update_chart_ratio();
+      }
+      return this;
+  };
+
+  that.add_bar = function(bar) {
+      if (bar) {
+          this._bars.push(bar);
+          bar._bar_id = this.bar_count++;
+          this._update_limits();
+          //this._update_chart_ratio();
+      }
+      return this;
+  };
+
+  // Hugly Hack : convert hist to bar and add
+  that.add_hist = function(hist) {
+    if (hist) {
+      var bins = hist._histbins;
+      var y = new Array(bins);
+      var x = new Array(bins);
+      for (var i = 0; i < y.length; i++)
+          x[i] = y[i] = 0;
+      var xmax = d3.max(hist._x);
+      var xmin = d3.min(hist._x);
+      var h = (xmax - xmin) / bins;
+      var count = hist._x.length;
+      for (var i = 0; i < hist._x.length; i++) {
+        var k = Math.floor( (hist._x[i] - xmin) / h );
+        if (k == y.length) { k--; }
+        y[k] += 1;
+      }
+      for (var i = 0; i < y.length; i++) {
+        x[i] = xmin + i * h;
+        if (hist._normed) { y[i] /= count * h; }
+      }
+      hist._graphtype = "bar";
+      hist._y = y;
+      hist._x = x;
+      hist._barwidth = h;
+      this.add_bar(hist);
+    }
+  };
+
+  that.add_text = function(text) {
+    if (text) {
+      this._texts.push(text);
+      text._text_id = this.text_count++;
+    }
     return this;
   };
 
@@ -801,6 +1249,8 @@ jsplotlib.plot = function(chart) {
   that._xaxis = jsplotlib.construct_axis(that, "x");
   that._yaxis = jsplotlib.construct_axis(that, "y");
   that._axes = [that._xaxis, that._yaxis];
+  that._xlim = null;
+  that._ylim = null;
 
   // returns the next color in the cycle
   that.get_next_color = function() {
@@ -853,6 +1303,14 @@ jsplotlib.plot = function(chart) {
     return this;
   };
 
+  that.xgrid = function(b) {
+    this._xaxis._grid(b);
+  };
+
+  that.ygrid = function(b) {
+    this._yaxis._grid(b);
+  };
+
   that.title = function(title_string) {
     this._title_string = title_string;
     this._title_size = this._chartheight * 0.1;
@@ -861,14 +1319,47 @@ jsplotlib.plot = function(chart) {
     return this;
   };
 
+  // force xlimits and ylimits
+  that._set_xlim = function(lim) {
+    this._xlim = lim;
+    this._xlimits(lim);
+    return this;
+  };
+
+  that._set_ylim = function(lim) {
+    this._ylim = lim;
+    this._ylimits(lim);
+    return this;
+  };
+    
+  that._get_xlim = function() {
+    if (!this._xaxis._domain)
+        return [0,1];
+    return this._xaxis._domain;
+  }
+
+  that._get_ylim = function() {
+    if (!this._yaxis._domain)
+        return [0,1];
+    return this._yaxis._domain;
+  }
+
   // sets the ylimits based on a minmax array/tuple
   that._ylimits = function(min_max_tuple) {
-    this._yaxis._set_data_range(min_max_tuple);
+    if (this._ylim === null) {
+        this._yaxis._set_data_range(min_max_tuple);
+    } else {
+        this._yaxis._set_data_range(this._ylim);
+    }
     return this;
   };
 
   that._xlimits = function(min_max_tuple) {
-    this._xaxis._set_data_range(min_max_tuple);
+    if (this._xlim === null) {
+        this._xaxis._set_data_range(min_max_tuple);
+    } else {
+        this._xaxis._set_data_range(this._xlim);
+    }
     return this;
   };
 
@@ -883,8 +1374,37 @@ jsplotlib.plot = function(chart) {
       ys = ys.concat(this._lines[i]._y);
     }
 
-    this._xlimits([d3.min(xs), d3.max(xs)]);
-    this._ylimits([d3.min(ys), d3.max(ys)]);
+    for (i = 0; i < this._scatters.length; i++) {
+        xs = xs.concat(this._scatters[i]._x);
+        ys = ys.concat(this._scatters[i]._y);
+    }
+
+    var xmin = d3.min(xs);
+    var xmax = d3.max(xs);
+    var ymin = d3.min(ys);
+    var ymax = d3.max(ys);
+
+    if (this._bars.length > 0) {
+        var xbs = [];
+        var ybs = [];
+        for (i = 0; i < this._bars.length; i++) {
+            xbs = xbs.concat(this._bars[i]._x);
+            ybs = ybs.concat(this._bars[i]._y);
+        }
+        var xbmin = d3.min(xbs);
+        var xbmax = d3.max(xbs)+1;   // default bar width space
+        var ybmin = d3.min(ybs);
+        var ybmax = d3.max(ybs);
+        ybmin = (ybmin > 0 ? 0 : ybmin);
+        ybmax = (ybmax < 0 ? 0 : ybmax);
+        xmin = (xmin == undefined || xmin > xbmin ? xbmin : xmin);
+        xmax = (xmax == undefined || xmax < xbmax ? xbmax : xmax);
+        ymin = (ymin == undefined || ymin > ybmin ? ybmin : ymin);
+        ymax = (ymax == undefined || ymax < ybmax ? ybmax : ymax);
+    }
+
+    this._xlimits([xmin, xmax]);
+    this._ylimits([ymin, ymax]);
 
     return this;
   };
@@ -910,6 +1430,7 @@ jsplotlib.plot = function(chart) {
       var ys = []; // all y-values
 
       // calculate limits
+      /*
       for (i = 0; i < this._lines.length; i++) {
         xs = xs.concat(this._lines[i]._x);
         ys = ys.concat(this._lines[i]._y);
@@ -917,6 +1438,12 @@ jsplotlib.plot = function(chart) {
 
       var _abs_height = Math.abs(d3.min(xs) - d3.max(xs));
       var _abs_width = Math.abs(d3.min(ys) - d3.max(ys));
+      */
+      var xlims = this._get_xlim();
+      var ylims = this._get_ylim();
+      
+      var _abs_height = Math.abs(xlims[0] - xlims[1]);
+      var _abs_width = Math.abs(ylims[0] - ylims[1]);
 
       var w_ratio = _abs_height / _abs_width;
       var h_ratio = _abs_width / _abs_height;
@@ -946,6 +1473,17 @@ jsplotlib.plot = function(chart) {
 
   that.get_xscale = function() {
     return this._xaxis.get_scale();
+  };
+
+  // defines lines and points clipping
+  that._create_clipping = function() {
+    chart.append("svg:clipPath").attr("id", get_clipping_id())
+    .append("rect")
+    .attr("fill", "white")
+    .attr("x", that._yaxis._size)
+    .attr("y", that._title_size)
+    .attr("width", that._width)
+    .attr("height", that._height-that._title_size);
   };
 
   // creates axes
@@ -1022,9 +1560,26 @@ jsplotlib.plot = function(chart) {
 
     this._init_common(); //
 
+    this._create_clipping();
+
+    // draw scatters
+    for (i = 0; i < this._scatters.length; i++) {
+        this._scatters[i].draw(this);
+    }
+
+    // draw bars
+    for (i = 0; i < this._bars.length; i++) {
+        this._bars[i].draw(this);
+    }
+
     // draw lines
     for (i = 0; i < this._lines.length; i++) {
       this._lines[i].draw(this);
+    }
+      
+    // draw texts
+    for (i = 0; i < this._texts.length; i++) {
+      this._texts[i].draw(this);
     }
 
     this._draw_axes();
@@ -1317,12 +1872,12 @@ jsplotlib.make_chart = function(width, height, insert_container, insert_mode,
   var DEFAULT_PADDING = 10;
   insert_container = insert_container || "body";
   width = width - 2 * DEFAULT_PADDING || 500;
-  height = height - 2 * DEFAULT_PADDING || 200;
+  height = height - 2 * DEFAULT_PADDING || 400;
   attributes = attributes || {};
 
   // create id, if not given
   if (!('id' in attributes)) {
-    attributes.id = 'chart' + chart_counter;
+    attributes.id = get_chart_id();
   }
 
   var chart;
@@ -1361,14 +1916,15 @@ jsplotlib.construct_axis = function() {
     that._will_draw_axis = true;
     that._x_or_y = x_or_y;
     that._size = 0;
+    that._show_grid = false;
     that._label_offset = 0;
     that._label_string = "";
     if (x_or_y === "x") {
-      that._axis_proportion = 0.12;
-      that._label_proportion = 0.12;
+      that._axis_proportion = 0.08;
+      that._label_proportion = 0.06;
     } else if (x_or_y === "y") {
-      that._axis_proportion = 0.07;
-      that._label_proportion = 0.05;
+      that._axis_proportion = 0.06;
+      that._label_proportion = 0.03;
     } else {
       throw "Invalid axis type (must be x or y): " + this._x_or_y;
     }
@@ -1456,9 +2012,9 @@ jsplotlib.construct_axis = function() {
       if (this._x_or_y === "x") {
         offset_h = 0;
         offset_v = parent_graph._height;
-        offset_label_h = parent_graph._yaxis._size + parent_graph._chartwidth /
-          2;
-        offset_label_v = parent_graph._height + this._size - this._label_offset;
+        offset_label_h = (parent_graph._yaxis._size + parent_graph._chartwidth) /
+          2 - 20;
+        offset_label_v = parent_graph._height + this._size - this._label_offset - 20;
         this._writing_mode = "horizontal-tb";
         this._orientation = "bottom";
       } else if (this._x_or_y === "y") {
@@ -1466,7 +2022,7 @@ jsplotlib.construct_axis = function() {
         offset_v = 0;
         offset_label_h = this._label_offset;
         offset_label_v = parent_graph._chartheight / 2;
-        label_rotation = "rotate(270)";
+        label_rotation = "rotate(180)";
         this._writing_mode = "vertical-rl";
         this._orientation = "left";
       } else {
@@ -1484,17 +2040,34 @@ jsplotlib.construct_axis = function() {
         this._compute_transform_string();
         this._axis = d3.svg.axis().scale(this.get_scale()).ticks(this.n_ticks)
           .orient(this._orientation).tickSubdivide(0).tickFormat(this._formatter);
-        parent_graph.chart.append("svg:g").attr("id", this._id).attr("class",
-          this._x_or_y + " axis").attr("transform", this._transform_string).call(
-          this._axis);
+        if (this._show_grid) {
+            var size = 0;
+            if (this._x_or_y === "x") {
+                size = parent_graph._height - parent_graph._title_size;
+            } else if (this._x_or_y === "y") {
+                size = parent_graph._width;
+            }
+            this._axis = this._axis.tickSize(-size);
+            parent_graph.chart.append("svg:g").attr("id", this._id).attr("class",
+                this._x_or_y + " axis").attr("transform", this._transform_string).call(
+                this._axis).selectAll(".tick line")
+                .attr("stroke-dasharray", "5,5");
+        } else {
+            parent_graph.chart.append("svg:g").attr("id", this._id).attr("class",
+                this._x_or_y + " axis").attr("transform", this._transform_string).call(
+                this._axis);
+        }
       }
+    };
+    that._grid = function(b) {
+        this._show_grid = b < 0 ? !this._show_grid : b;
     };
     that._draw_label = function() {
       this._compute_transform_string();
       if (this._will_draw_axis && this._will_draw_label) {
         parent_graph.chart.append("svg:g").attr("class", this._x_or_y +
           " axis_label").attr("transform", this._label_transform_string).append(
-          "text").append("tspan").attr("text-anchor", "middle").attr("class",
+          "text").append("tspan").attr("text-anchor", "top").attr("class",
           this._x_or_y + " axis_label").attr("writing-mode", this._writing_mode)
           .text(this._label_string);
       }
@@ -1504,30 +2077,30 @@ jsplotlib.construct_axis = function() {
 }();
 
 jsplotlib.parse_marker = function(style) {
-  if (!style) return "x";
+  if (!style) return "";
   switch (style) {
     case '.':
       return ".";
     case ',':
-      return "x";
+      return ",";
     case 'o':
       return "o";
     case 'v':
-      return "x";
+      return "v";
     case '^':
-      return "x";
+      return "^";
     case '<':
-      return "x";
+      return "<";
     case '>':
-      return "x";
+      return ">";
     case '1':
-      return "x";
+      return "1";
     case '2':
-      return "x";
+      return "2";
     case '3':
-      return "x";
+      return "3";
     case '4':
-      return "x";
+      return "4";
     case 's':
       return "s";
     case 'p':
@@ -1539,17 +2112,17 @@ jsplotlib.parse_marker = function(style) {
     case 'H':
       return "x";
     case '+':
-      return "x";
+      return "+";
     case 'x':
       return "x";
     case 'D':
-      return "x";
+      return "D";
     case 'd':
-      return "x";
+      return "d";
     case '|':
-      return "x";
+      return "|";
     case '_':
-      return "x";
+      return "_";
     default:
       return "";
   }
@@ -1824,7 +2397,7 @@ var $builtinmodule = function(name) {
     if (!chart) {
       $('#' + Sk.canvas).empty();
       // min height and width
-      chart = jsplotlib.make_chart(600, 600, "#" + Sk.canvas);
+      chart = jsplotlib.make_chart(550, 460, "#" + Sk.canvas);
     }
   };
 
@@ -1935,6 +2508,7 @@ var $builtinmodule = function(name) {
     if (xdata.length === 1 && ydata.length === 1 && stylestring.length === 0) {
       // handle case for plot(x, y)
       line = new jsplotlib.Line2D(xdata[0], ydata[0]);
+      line.update(kwargs);
       plot.add_line(line);
     } else if (xdata.length === ydata.length && xdata.length === stylestring.length) {
       for (i = 0; i < xdata.length; i++) {
@@ -1945,6 +2519,7 @@ var $builtinmodule = function(name) {
           'marker': jsplotlib.parse_marker(ftm_tuple.marker),
           'color': ftm_tuple.color
         });
+        line.update(kwargs);
         plot.add_line(line);
       }
     } else {
@@ -1952,7 +2527,7 @@ var $builtinmodule = function(name) {
     }
 
     // set kwargs that apply for all lines
-    plot.update(kwargs);
+    //plot.update(kwargs);
 
     // result
     var result = [];
@@ -2038,29 +2613,45 @@ var $builtinmodule = function(name) {
   ];
   mod.title = new Sk.builtin.func(title_f);
 
-  var axis_f = function(label, fontdict, loc) {
-    Sk.builtin.pyCheckArgs("axis", arguments, 0, 3);
-
+  // axis function
+  var axis_f = function(v) {
+    Sk.builtin.pyCheckArgs("axis", arguments, 0, 1, false);
+    
+    var lim = null;
+      
     // when called without any arguments it should return the current axis limits
-
-    if (plot && plot._axes) {
-      console.log(plot._axes);
+    if (arguments.length <= 0) {
+        lim = (plot ? plot._get_xlim() : [0,1]);
+        lim = lim.concat(plot ? plot._get_ylim() : [0,1]);
+        return new Sk.builtins.tuple(lim);
     }
 
     // >>> axis(v)
     // sets the min and max of the x and y axes, with
     // ``v = [xmin, xmax, ymin, ymax]``.::
+    if (Sk.builtin.checkSequence(v)) {
+        lim = Sk.ffi.remapToJs(v);
+    } else if (Sk.builtin.checkString(v)) {
+        var info = Sk.ffi.remapToJs(v);
+    } else {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(v) + "' is not supported for v.");
+    }
+
+    create_chart();
+    if (!plot) {
+        plot = jsplotlib.plot(chart);
+    }
+    if (plot && plot._axes && lim !== null) {
+        plot._set_xlim([lim[0],lim[1]]);
+        plot._set_ylim([lim[2],lim[3]]);
+    }
 
     //The xmin, xmax, ymin, ymax tuple is returned
-    var res;
-
-    return Sk.ffi.remapToPy([]);
+    return new Sk.builtins.tuple(lim);
   };
 
-  axis_f.co_varnames = ['label', 'fontdict', 'loc', ];
-  axis_f.$defaults = [null, Sk.builtin.none.none$, Sk.builtin.none.none$,
-    Sk.builtin.none.none$
-  ];
+  axis_f.co_varnames = ['v'];
+  axis_f.$defaults = [Sk.builtin.none.none$];
   mod.axis = new Sk.builtin.func(axis_f);
 
   var xlabel_f = function(s, fontdict, loc) {
@@ -2125,6 +2716,527 @@ var $builtinmodule = function(name) {
   };
 
   mod.clf = new Sk.builtin.func(clf_f);
+
+  // xlim function
+  var xlim_f = function(s, e) {
+    Sk.builtin.pyCheckArgs("xlim", arguments, 0, 2, false);
+
+    if (arguments.length <= 0)
+        return new Sk.builtins.tuple(plot ? plot._get_xlim() : [0,1]);
+
+    if (Sk.builtin.checkSequence(s)) {
+        lim = Sk.ffi.remapToJs(s);
+    } else if (Sk.builtin.checkNumber(s)) {
+        if (Sk.builtin.checkNumber(e)) {
+            lim = [ Sk.ffi.remapToJs(s), Sk.ffi.remapToJs(e) ];
+        } else {
+            throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(e) + "' is not supported for e.");
+        }
+    } else {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(s) + "' is not supported for s.");
+    }
+    if (lim[0] > lim[1]) { lim = [lim[1],lim[0]]; }
+
+    create_chart();
+    if (!plot) {
+        plot = jsplotlib.plot(chart);
+    }
+    if (plot) {
+        plot._set_xlim(lim);
+    }
+  };
+
+  xlim_f.co_varnames = ['s', 'e'];
+  xlim_f.$defaults = [Sk.builtin.none.none$, Sk.builtin.none.none$];
+  mod.xlim = new Sk.builtin.func(xlim_f);
+
+  // ylim function
+  var ylim_f = function(s, e) {
+    Sk.builtin.pyCheckArgs("ylim", arguments, 0, 2, false);
+
+    if (arguments.length <= 0)
+        return new Sk.builtins.tuple(plot ? plot._get_ylim() : [0,1]);
+
+    if (Sk.builtin.checkSequence(s)) {
+        lim = Sk.ffi.remapToJs(s);
+    } else if (Sk.builtin.checkNumber(s)) {
+        if (Sk.builtin.checkNumber(e)) {
+            lim = [ Sk.ffi.remapToJs(s), Sk.ffi.remapToJs(e) ];
+        } else {
+            throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(e) + "' is not supported for e.");
+        }
+    } else {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(s) + "' is not supported for s.");
+    }
+    if (lim[0] > lim[1]) { lim = [lim[1],lim[0]]; }
+
+    create_chart();
+    if (!plot) {
+        plot = jsplotlib.plot(chart);
+    }
+    if (plot) {
+        plot._set_ylim(lim);
+    }
+  };
+
+  ylim_f.co_varnames = ['s', 'e'];
+  ylim_f.$defaults = [Sk.builtin.none.none$, Sk.builtin.none.none$];
+  mod.ylim = new Sk.builtin.func(ylim_f);
+
+  // grid function
+  var grid_f = function(b,axis,which) {
+    Sk.builtin.pyCheckArgs("grid", arguments, 0, 3, false, false);
+
+    if (which != null && !Sk.builtin.checkNone(which)) {
+        throw new Sk.builtin.NotImplementedError("the 'which' parameter is currently not supported");
+    }
+
+    if (axis == null) {
+        axis = "both";
+    } else if (Sk.builtin.checkString(axis)) {
+        axis = Sk.ffi.remapToJs(axis);
+    } else {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(axis) + "' is not supported for axis.");
+    }
+
+    if (axis !== "both" && axis !== "x" && axis !== "y") {
+        throw new Sk.builtin.ValueError("axis: must be 'both' (default), 'x' or 'y'");
+    }
+
+    if (b == null) {
+        b = -1;
+    } else if (Sk.builtin.checkBool(b)) {
+        b = Sk.ffi.remapToJs(b) ? 1 : 0;
+    } else {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(b) + "' is not supported for b.");
+    }
+
+    create_chart();
+    if (!plot) {
+        plot = jsplotlib.plot(chart);
+    }
+    if (plot) {
+        if (axis === "both" || axis === "x")
+            plot.xgrid(b);
+        if (axis === "both" || axis === "y")
+            plot.ygrid(b);
+    }
+  };
+
+  grid_f.co_varnames=["b","axis","which"];
+  grid_f.$defaults = [Sk.builtin.bool.true$,Sk.builtin.none.none$,Sk.builtin.none.none$];
+  mod.grid = new Sk.builtin.func(grid_f);
+
+  // bar function
+  var bar_f = function(left, height, width, color, edgecolor, align, bottom, alpha) {
+    Sk.builtin.pyCheckArgs("bar", arguments, 0, 8, false);
+
+    if (left == null || Sk.builtin.checkNone(left)) {
+        throw new Sk.builtin.ValueError("missing 1 required positional argument: 'left'");
+    }
+
+    if (height == null || Sk.builtin.checkNone(height)) {
+        throw new Sk.builtin.ValueError("missing 1 required positional argument: 'height'");
+    }
+
+    if (color != null && !Sk.builtin.checkString(color)) {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(color) + "' is not supported for color.");
+    }
+    if (color != null) {
+        color = Sk.ffi.remapToJs(color);
+    } else {
+        color = "blue";
+    }
+
+    if (edgecolor != null && !Sk.builtin.checkString(edgecolor)) {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(edgecolor) + "' is not supported for edgecolor.");
+    }
+    if (edgecolor != null) {
+        edgecolor = Sk.ffi.remapToJs(edgecolor);
+    } else {
+        edgecolor = "black";
+    }
+
+    if (alpha != null && !Sk.builtin.checkNumber(alpha)) {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(edgecolor) + "' is not supported for alpha.");
+    }
+    if (alpha != null) {
+        alpha = Sk.ffi.remapToJs(alpha);
+    } else {
+        alpha = 1.0;
+    }
+
+    if (align == null) {
+        align = "edge";
+    } else if (Sk.builtin.checkString(align)) {
+        align = Sk.ffi.remapToJs(align);
+    } else {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(align) + "' is not supported for align.");
+    }
+    if (align != "edge" && align != "center") {
+        throw new Sk.builtin.ValueError("align: must be 'edge' (default), 'center'");
+    }
+
+    if (bottom != null && !Sk.builtin.checkNone(bottom)) {
+        throw new Sk.builtin.NotImplementedError("the 'bottom' parameter is currently not supported");
+    }
+
+    if (Sk.builtin.checkSequence(left)) {
+        left = Sk.ffi.remapToJs(left);
+    } else if (Sk.abstr.typeName(left) === CLASS_NDARRAY) {
+        var data = Sk.ffi.unwrapn(left);
+        var dim = 0;
+        if (data && data.shape && data.shape[0]) {
+            dim = data.shape[0];
+        } else {
+            throw new Sk.builtin.ValueError('left contain "' + CLASS_NDARRAY + '" without elements or malformed shape.');
+        }
+        left = data.buffer.slice(0, dim).map(function(x) { return Sk.ffi.remapToJs(x); });
+    } else {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(left) + "' is not supported for left.");
+    }
+
+    if (Sk.builtin.checkSequence(height)) {
+        height = Sk.ffi.remapToJs(height);
+    } else if (Sk.abstr.typeName(height) === CLASS_NDARRAY) {
+        var data = Sk.ffi.unwrapn(height);
+        var dim = 0;
+        if (data && data.shape && data.shape[0]) {
+            dim = data.shape[0];
+        } else {
+            throw new Sk.builtin.ValueError('height contain "' + CLASS_NDARRAY + '" without elements or malformed shape.');
+        }
+        height = data.buffer.slice(0, dim).map(function(x) { return Sk.ffi.remapToJs(x); });
+    } else {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(height) + "' is not supported for height.");
+    }
+
+    if (width == null) {
+        width = 0.8;
+    } else if (Sk.builtin.checkNumber(width)) {
+        width = Sk.ffi.remapToJs(width);
+    } else if (Sk.builtin.checkSequence(width)) {
+        width = Sk.ffi.remapToJs(width);
+    } else if (Sk.abstr.typeName(width) === CLASS_NDARRAY) {
+        var data = Sk.ffi.unwrapn(width);
+        var dim = 0;
+        if (data && data.shape && data.shape[0]) {
+            dim = data.shape[0];
+        } else {
+            throw new Sk.builtin.ValueError('width contain "' + CLASS_NDARRAY + '" without elements or malformed shape.');
+        }
+        width = data.buffer.slice(0, dim).map(function(x) { return Sk.ffi.remapToJs(x); });
+    } else {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(width) + "' is not supported for width.");
+    }
+
+    create_chart();
+    if (!plot) {
+        plot = jsplotlib.plot(chart);
+    }
+    if (plot) {
+        bar = new jsplotlib.Line2D(left, height);
+        bar.update({
+            "graphtype":       "bar",
+            "barwidth":        width,
+            "color":           color,
+            "markeredgecolor": edgecolor,
+            "drawstyle":       align,
+            "alpha":           alpha
+        });
+        plot.add_bar(bar);
+    }
+  };
+
+  bar_f.co_varnames=["left","height","width","color","edgecolor","align","bottom","alpha"];
+  bar_f.$defaults = [Sk.builtin.none.none$,Sk.builtin.none.none$,Sk.builtin.none.none$,
+                     Sk.builtin.none.none$,Sk.builtin.none.none$,Sk.builtin.none.none$,
+                     Sk.builtin.none.none$,Sk.builtin.none.none$];
+  mod.bar = new Sk.builtin.func(bar_f);
+
+  // hist function
+  var hist_f = function(x, bins, normed, color, edgecolor, align, alpha) {
+    Sk.builtin.pyCheckArgs("hist", arguments, 0, 7, false);
+
+    if (x == null || Sk.builtin.checkNone(x)) {
+        throw new Sk.builtin.ValueError("missing 1 required positional argument: 'x'");
+    }
+
+    if (bins != null && !Sk.builtin.checkNumber(bins)) {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(bins) + "' is not supported for 'bins'.");
+    }
+    if (bins != null) {
+        bins = Sk.ffi.remapToJs(bins);
+    } else {
+        bins = 10;
+    }
+
+    if (normed != null && !Sk.builtin.checkBool(normed)) {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(normed) + "' is not supported for 'normed'.");
+    }
+    if (normed != null) {
+        normed = Sk.ffi.remapToJs(normed);
+    } else {
+        normed = false;
+    }
+
+    if (color != null && !Sk.builtin.checkString(color)) {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(color) + "' is not supported for 'color'.");
+    }
+    if (color != null) {
+        color = Sk.ffi.remapToJs(color);
+    } else {
+        color = "blue";
+    }
+
+    if (edgecolor != null && !Sk.builtin.checkString(edgecolor)) {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(edgecolor) + "' is not supported for 'edgecolor'.");
+    }
+    if (edgecolor != null) {
+        edgecolor = Sk.ffi.remapToJs(edgecolor);
+    } else {
+        edgecolor = "black";
+    }
+
+    if (alpha != null && !Sk.builtin.checkNumber(alpha)) {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(alpha) + "' is not supported for alpha.");
+    }
+    if (alpha != null) {
+        alpha = Sk.ffi.remapToJs(alpha);
+    } else {
+        alpha = 1.0;
+    }
+
+    if (align == null) {
+        align = "edge";
+    } else if (Sk.builtin.checkString(align)) {
+        align = Sk.ffi.remapToJs(align);
+    } else {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(align) + "' is not supported for align.");
+    }
+    if (align != "edge" && align != "center") {
+        throw new Sk.builtin.ValueError("align: must be 'edge' (default), 'center'");
+    }
+
+    if (Sk.builtin.checkSequence(x)) {
+        x = Sk.ffi.remapToJs(x);
+    } else if (Sk.abstr.typeName(x) === CLASS_NDARRAY) {
+        var data = Sk.ffi.unwrapn(x);
+        var dim = 0;
+        if (data && data.shape && data.shape[0]) {
+            dim = data.shape[0];
+        } else {
+            throw new Sk.builtin.ValueError('x contain "' + CLASS_NDARRAY + '" without elements or malformed shape.');
+        }
+        x = data.buffer.slice(0, dim).map(function(t) { return Sk.ffi.remapToJs(t); });
+    } else {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(x) + "' is not supported for 'x'.");
+    }
+
+    create_chart();
+    if (!plot) {
+        plot = jsplotlib.plot(chart);
+    }
+    if (plot) {
+        hist = new jsplotlib.Line2D(x);
+        hist.update({
+            "graphtype":       "hist",
+            "histbins":        bins,
+            "normed":          normed,
+            "color":           color,
+            "markeredgecolor": edgecolor,
+            "drawstyle":       align,
+            "alpha":           alpha
+        });
+        plot.add_hist(hist);
+    }
+    return Sk.ffi.remapToPy([hist._y, hist._x, null]);
+  };
+
+  hist_f.co_varnames=["x","bins","normed","color","edgecolor","align","alpha"];
+  hist_f.$defaults = [Sk.builtin.none.none$,Sk.builtin.none.none$,Sk.builtin.none.none$,
+                      Sk.builtin.none.none$,Sk.builtin.none.none$,Sk.builtin.none.none$,
+                      Sk.builtin.none.none$];
+  mod.hist = new Sk.builtin.func(hist_f);
+
+  // scatter function
+  var scatter_f = function(x, y, s, c, color, alpha) {
+    Sk.builtin.pyCheckArgs("scatter", arguments, 0, 6, false);
+
+    if (x == null || Sk.builtin.checkNone(x)) {
+        throw new Sk.builtin.ValueError("missing 1 required positional argument: 'x'");
+    }
+
+    if (y == null || Sk.builtin.checkNone(y)) {
+        throw new Sk.builtin.ValueError("missing 1 required positional argument: 'y'");
+    }
+
+    if (c != null && !Sk.builtin.checkString(c)) {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(c) + "' is not supported for c.");
+    }
+    if (c != null) {
+        c = Sk.ffi.remapToJs(c);
+    } else {
+        c = "blue";
+    }
+
+    if (color != null && !Sk.builtin.checkString(color)) {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(color) + "' is not supported for color.");
+    }
+    if (color != null) {
+        color = Sk.ffi.remapToJs(color);
+    } else {
+        color = "black";
+    }
+
+    if (alpha != null && !Sk.builtin.checkNumber(alpha)) {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(edgecolor) + "' is not supported for alpha.");
+    }
+    if (alpha != null) {
+        alpha = Sk.ffi.remapToJs(alpha);
+    } else {
+        alpha = 1.0;
+    }
+
+    if (Sk.builtin.checkSequence(x)) {
+        x = Sk.ffi.remapToJs(x);
+    } else if (Sk.abstr.typeName(x) === CLASS_NDARRAY) {
+        var data = Sk.ffi.unwrapn(x);
+        var dim = 0;
+        if (data && data.shape && data.shape[0]) {
+            dim = data.shape[0];
+        } else {
+            throw new Sk.builtin.ValueError('x contain "' + CLASS_NDARRAY + '" without elements or malformed shape.');
+        }
+        x = data.buffer.slice(0, dim).map(function(t) { return Sk.ffi.remapToJs(t); });
+    } else {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(x) + "' is not supported for x.");
+    }
+
+    if (Sk.builtin.checkSequence(y)) {
+        y = Sk.ffi.remapToJs(y);
+    } else if (Sk.abstr.typeName(y) === CLASS_NDARRAY) {
+        var data = Sk.ffi.unwrapn(y);
+        var dim = 0;
+        if (data && data.shape && data.shape[0]) {
+            dim = data.shape[0];
+        } else {
+            throw new Sk.builtin.ValueError('y contain "' + CLASS_NDARRAY + '" without elements or malformed shape.');
+        }
+        y = data.buffer.slice(0, dim).map(function(t) { return Sk.ffi.remapToJs(t); });
+    } else {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(y) + "' is not supported for y.");
+    }
+
+    if (s == null) {
+        s = 20.0;
+    } else if (Sk.builtin.checkNumber(s)) {
+        s = Sk.ffi.remapToJs(s);
+    } else if (Sk.builtin.checkSequence(s)) {
+        s = Sk.ffi.remapToJs(s);
+    } else if (Sk.abstr.typeName(s) === CLASS_NDARRAY) {
+        var data = Sk.ffi.unwrapn(s);
+        var dim = 0;
+        if (data && data.shape && data.shape[0]) {
+            dim = data.shape[0];
+        } else {
+            throw new Sk.builtin.ValueError('s contain "' + CLASS_NDARRAY + '" without elements or malformed shape.');
+        }
+        s = data.buffer.slice(0, dim).map(function(t) { return Sk.ffi.remapToJs(t); });
+    } else {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(s) + "' is not supported for s.");
+    }
+
+    create_chart();
+    if (!plot) {
+        plot = jsplotlib.plot(chart);
+    }
+    if (plot) {
+        scatter = new jsplotlib.Line2D(x, y);
+        scatter.update({
+            "graphtype":       "scatter",
+            "color":           color,
+            "linestyle":       "",
+            "marker":          "s",
+            "markersize":      s,
+            "markeredgecolor": c,
+            "alpha":           alpha
+        });
+        plot.add_scatter(scatter);
+    }
+  };
+
+  scatter_f.co_varnames=["x","y","s","c","color","alpha"];
+  scatter_f.$defaults = [Sk.builtin.none.none$,Sk.builtin.none.none$,Sk.builtin.none.none$,
+                     Sk.builtin.none.none$,Sk.builtin.none.none$,Sk.builtin.none.none$];
+  mod.scatter = new Sk.builtin.func(scatter_f);
+
+  // text function
+  var text_f = function(x, y, s, color, fontsize) {
+    Sk.builtin.pyCheckArgs("text", arguments, 3, 5, false);
+
+    if (x == null || Sk.builtin.checkNone(x)) {
+        throw new Sk.builtin.ValueError("missing 1 required positional argument: 'x'");
+    }
+    if (Sk.builtin.checkNumber(x)) {
+        x = Sk.ffi.remapToJs(x);
+    } else {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(x) + "' is not supported for x.");
+    }
+    if (y == null || Sk.builtin.checkNone(y)) {
+        throw new Sk.builtin.ValueError("missing 1 required positional argument: 'y'");
+    }
+    if (Sk.builtin.checkNumber(y)) {
+        y = Sk.ffi.remapToJs(y);
+    } else {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(y) + "' is not supported for y.");
+    }
+    if (s == null || Sk.builtin.checkNone(s)) {
+        throw new Sk.builtin.ValueError("missing 1 required positional argument: 's'");
+    }
+    if (Sk.builtin.checkString(s)) {
+        s = Sk.ffi.remapToJs(s);
+    } else {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(s) + "' is not supported for s.");
+    }
+    if (color != null && !Sk.builtin.checkString(color)) {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(color) + "' is not supported for 'color'.");
+    }
+    if (color != null) {
+        color = Sk.ffi.remapToJs(color);
+    } else {
+        color = "black";
+    }
+    if (fontsize != null && !Sk.builtin.checkNumber(fontsize)) {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(fontsize) + "' is not supported for 'fontsize'.");
+    }
+    if (fontsize != null) {
+        fontsize = Sk.ffi.remapToJs(fontsize);
+    } else {
+        fontsize = 10;
+    }
+
+    create_chart();
+    if (!plot) {
+        plot = jsplotlib.plot(chart);
+    }
+    if (plot) {
+        text = new jsplotlib.Line2D([x],[y]);
+        text.update({
+            "graphtype": "text",
+            "text": [s],
+            "color": color,
+            "fontsize": fontsize
+        });
+        plot.add_text(text);
+    }
+  };
+
+  text_f.co_varnames = ["x","y","s","color","fontsize"];
+  text_f.$defaults = [Sk.builtin.none.none$, Sk.builtin.none.none$, Sk.builtin.none.none$, 
+                      Sk.builtin.none.none$, Sk.builtin.none.none$];
+  mod.text = new Sk.builtin.func(text_f);
+
 
   /* list of not implemented methods */
   mod.findobj = new Sk.builtin.func(function() {
@@ -2287,14 +3399,6 @@ var $builtinmodule = function(name) {
   mod.box = new Sk.builtin.func(function() {
     throw new Sk.builtin.NotImplementedError("box is not yet implemented");
   });
-  mod.xlim = new Sk.builtin.func(function() {
-    throw new Sk.builtin.NotImplementedError(
-      "xlim is not yet implemented");
-  });
-  mod.ylim = new Sk.builtin.func(function() {
-    throw new Sk.builtin.NotImplementedError(
-      "ylim is not yet implemented");
-  });
   mod.xscale = new Sk.builtin.func(function() {
     throw new Sk.builtin.NotImplementedError(
       "xscale is not yet implemented");
@@ -2407,9 +3511,6 @@ var $builtinmodule = function(name) {
     throw new Sk.builtin.NotImplementedError(
       "axvspan is not yet implemented");
   });
-  mod.bar = new Sk.builtin.func(function() {
-    throw new Sk.builtin.NotImplementedError("bar is not yet implemented");
-  });
   mod.barh = new Sk.builtin.func(function() {
     throw new Sk.builtin.NotImplementedError(
       "barh is not yet implemented");
@@ -2465,10 +3566,6 @@ var $builtinmodule = function(name) {
     throw new Sk.builtin.NotImplementedError(
       "hexbin is not yet implemented");
   });
-  mod.hist = new Sk.builtin.func(function() {
-    throw new Sk.builtin.NotImplementedError(
-      "hist is not yet implemented");
-  });
   mod.hist2d = new Sk.builtin.func(function() {
     throw new Sk.builtin.NotImplementedError(
       "hist2d is not yet implemented");
@@ -2514,10 +3611,6 @@ var $builtinmodule = function(name) {
   mod.quiverkey = new Sk.builtin.func(function() {
     throw new Sk.builtin.NotImplementedError(
       "quiverkey is not yet implemented");
-  });
-  mod.scatter = new Sk.builtin.func(function() {
-    throw new Sk.builtin.NotImplementedError(
-      "scatter is not yet implemented");
   });
   mod.semilogx = new Sk.builtin.func(function() {
     throw new Sk.builtin.NotImplementedError(
@@ -2578,10 +3671,6 @@ var $builtinmodule = function(name) {
   mod.cla = new Sk.builtin.func(function() {
     throw new Sk.builtin.NotImplementedError("cla is not yet implemented");
   });
-  mod.grid = new Sk.builtin.func(function() {
-    throw new Sk.builtin.NotImplementedError(
-      "grid is not yet implemented");
-  });
   mod.legend = new Sk.builtin.func(function() {
     throw new Sk.builtin.NotImplementedError(
       "legend is not yet implemented");
@@ -2589,10 +3678,6 @@ var $builtinmodule = function(name) {
   mod.table = new Sk.builtin.func(function() {
     throw new Sk.builtin.NotImplementedError(
       "table is not yet implemented");
-  });
-  mod.text = new Sk.builtin.func(function() {
-    throw new Sk.builtin.NotImplementedError(
-      "text is not yet implemented");
   });
   mod.annotate = new Sk.builtin.func(function() {
     throw new Sk.builtin.NotImplementedError(
