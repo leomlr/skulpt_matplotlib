@@ -2787,28 +2787,32 @@ var $builtinmodule = function(name) {
   var grid_f = function(b,axis,which) {
     Sk.builtin.pyCheckArgs("grid", arguments, 0, 3, false, false);
 
-    if (which != null && !Sk.builtin.checkNone(which)) {
+    if (which.v != null && !Sk.builtin.checkNone(which)) {
         throw new Sk.builtin.NotImplementedError("the 'which' parameter is currently not supported");
     }
 
-    if (axis == null) {
-        axis = "both";
-    } else if (Sk.builtin.checkString(axis)) {
-        axis = Sk.ffi.remapToJs(axis);
-    } else {
+    if (axis.v !== null) {
+      if (!Sk.builtin.checkString(axis)) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(axis) + "' is not supported for axis.");
+      } else {
+        axis = Sk.ffi.remapToJs(axis);
+      }
+    } else {
+      axis = "both";
     }
 
     if (axis !== "both" && axis !== "x" && axis !== "y") {
         throw new Sk.builtin.ValueError("axis: must be 'both' (default), 'x' or 'y'");
     }
 
-    if (b == null) {
-        b = -1;
-    } else if (Sk.builtin.checkBool(b)) {
-        b = Sk.ffi.remapToJs(b) ? 1 : 0;
-    } else {
+    if (b.v !== null) {
+      if (!Sk.builtin.checkBool(b)) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(b) + "' is not supported for b.");
+      } else {
+        b = Sk.ffi.remapToJs(b) ? 1 : 0;
+      }
+    } else {
+      b = -1;
     }
 
     create_chart();
@@ -2876,10 +2880,10 @@ var $builtinmodule = function(name) {
         align = Sk.ffi.remapToJs(align);
       }
     } else {
-      align = "edge";
+      align = "center";
     }
     if (align != "edge" && align != "center") {
-      throw new Sk.builtin.ValueError("align: must be 'edge' (default), 'center'");
+      throw new Sk.builtin.ValueError("align: must be 'edge', 'center' (default)");
     }
 
 
@@ -2964,64 +2968,71 @@ var $builtinmodule = function(name) {
   var hist_f = function(x, bins, normed, color, edgecolor, align, alpha) {
     Sk.builtin.pyCheckArgs("hist", arguments, 0, 7, false);
 
-    if (x == null || Sk.builtin.checkNone(x)) {
-        throw new Sk.builtin.ValueError("missing 1 required positional argument: 'x'");
+    if (x.v === null || Sk.builtin.checkNone(x)) {
+      throw new Sk.builtin.ValueError("missing 1 required positional argument: 'x'");
     }
 
-    if (bins != null && !Sk.builtin.checkNumber(bins)) {
+    if (bins.v !== null) {
+      if (!Sk.builtin.checkNumber(bins)) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(bins) + "' is not supported for 'bins'.");
-    }
-    if (bins != null) {
+      } else {
         bins = Sk.ffi.remapToJs(bins);
+      }
     } else {
-        bins = 10;
+      bins = 10;
     }
 
-    if (normed != null && !Sk.builtin.checkBool(normed)) {
+    if (normed.v !== null) {
+      if (!Sk.builtin.checkBool(normed)) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(normed) + "' is not supported for 'normed'.");
-    }
-    if (normed != null) {
+      } else {
         normed = Sk.ffi.remapToJs(normed);
+      }
     } else {
-        normed = false;
+      normed = false;
     }
 
-    if (color != null && !Sk.builtin.checkString(color)) {
+    if (color.v !== null) {
+      if (!Sk.builtin.checkString(color)) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(color) + "' is not supported for 'color'.");
-    }
-    if (color != null) {
+      } else {
         color = Sk.ffi.remapToJs(color);
+      }
     } else {
-        color = "blue";
+      color = "blue";
     }
 
-    if (edgecolor != null && !Sk.builtin.checkString(edgecolor)) {
+    if (edgecolor.v !== null) {
+      if (!Sk.builtin.checkString(edgecolor)) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(edgecolor) + "' is not supported for 'edgecolor'.");
-    }
-    if (edgecolor != null) {
+      } else {
         edgecolor = Sk.ffi.remapToJs(edgecolor);
+      }
     } else {
-        edgecolor = "black";
+      edgecolor = "black";
     }
 
-    if (alpha != null && !Sk.builtin.checkNumber(alpha)) {
+    if (alpha.v !== null) {
+      if (!Sk.builtin.checkNumber(alpha)) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(alpha) + "' is not supported for alpha.");
-    }
-    if (alpha != null) {
+      } else {
         alpha = Sk.ffi.remapToJs(alpha);
+      }
     } else {
-        alpha = 1.0;
+      alpha = 1.0;
     }
 
-    if (align == null) {
-        align = "edge";
-    } else if (Sk.builtin.checkString(align)) {
-        align = Sk.ffi.remapToJs(align);
-    } else {
+    if (align.v !== null) {
+      if (!Sk.builtin.checkString(align)) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(align) + "' is not supported for align.");
+      } else {
+        align = Sk.ffi.remapToJs(align);
+      }
+    } else {
+      align = "center";
     }
     if (align != "edge" && align != "center") {
-        throw new Sk.builtin.ValueError("align: must be 'edge' (default), 'center'");
+        throw new Sk.builtin.ValueError("align: must be 'edge', 'center' (default)");
     }
 
     if (Sk.builtin.checkSequence(x)) {
@@ -3069,36 +3080,36 @@ var $builtinmodule = function(name) {
   var scatter_f = function(x, y, s, c, color, alpha) {
     Sk.builtin.pyCheckArgs("scatter", arguments, 0, 6, false);
 
-    if (x == null || Sk.builtin.checkNone(x)) {
+    if (x.v === null || Sk.builtin.checkNone(x)) {
         throw new Sk.builtin.ValueError("missing 1 required positional argument: 'x'");
     }
 
-    if (y == null || Sk.builtin.checkNone(y)) {
+    if (y.v === null || Sk.builtin.checkNone(y)) {
         throw new Sk.builtin.ValueError("missing 1 required positional argument: 'y'");
     }
 
-    if (c != null && !Sk.builtin.checkString(c)) {
+    if (c.v !== null && !Sk.builtin.checkString(c)) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(c) + "' is not supported for c.");
     }
-    if (c != null) {
+    if (c.v !== null) {
         c = Sk.ffi.remapToJs(c);
     } else {
         c = "blue";
     }
 
-    if (color != null && !Sk.builtin.checkString(color)) {
+    if (color.v !== null && !Sk.builtin.checkString(color)) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(color) + "' is not supported for color.");
     }
-    if (color != null) {
+    if (color.v !== null) {
         color = Sk.ffi.remapToJs(color);
     } else {
         color = "black";
     }
 
-    if (alpha != null && !Sk.builtin.checkNumber(alpha)) {
-        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(edgecolor) + "' is not supported for alpha.");
+    if (alpha.v != null && !Sk.builtin.checkNumber(alpha)) {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(alpha) + "' is not supported for alpha.");
     }
-    if (alpha != null) {
+    if (alpha.v !== null) {
         alpha = Sk.ffi.remapToJs(alpha);
     } else {
         alpha = 1.0;
@@ -3181,7 +3192,7 @@ var $builtinmodule = function(name) {
   var text_f = function(x, y, s, color, fontsize) {
     Sk.builtin.pyCheckArgs("text", arguments, 3, 5, false);
 
-    if (x == null || Sk.builtin.checkNone(x)) {
+    if (x.v === null || Sk.builtin.checkNone(x)) {
         throw new Sk.builtin.ValueError("missing 1 required positional argument: 'x'");
     }
     if (Sk.builtin.checkNumber(x)) {
@@ -3189,7 +3200,7 @@ var $builtinmodule = function(name) {
     } else {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(x) + "' is not supported for x.");
     }
-    if (y == null || Sk.builtin.checkNone(y)) {
+    if (y.v === null || Sk.builtin.checkNone(y)) {
         throw new Sk.builtin.ValueError("missing 1 required positional argument: 'y'");
     }
     if (Sk.builtin.checkNumber(y)) {
@@ -3197,7 +3208,7 @@ var $builtinmodule = function(name) {
     } else {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(y) + "' is not supported for y.");
     }
-    if (s == null || Sk.builtin.checkNone(s)) {
+    if (s.v === null || Sk.builtin.checkNone(s)) {
         throw new Sk.builtin.ValueError("missing 1 required positional argument: 's'");
     }
     if (Sk.builtin.checkString(s)) {
@@ -3205,18 +3216,18 @@ var $builtinmodule = function(name) {
     } else {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(s) + "' is not supported for s.");
     }
-    if (color != null && !Sk.builtin.checkString(color)) {
+    if (color.v !== null && !Sk.builtin.checkString(color)) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(color) + "' is not supported for 'color'.");
     }
-    if (color != null) {
+    if (color.v !== null) {
         color = Sk.ffi.remapToJs(color);
     } else {
         color = "black";
     }
-    if (fontsize != null && !Sk.builtin.checkNumber(fontsize)) {
+    if (fontsize.v !== null && !Sk.builtin.checkNumber(fontsize)) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(fontsize) + "' is not supported for 'fontsize'.");
     }
-    if (fontsize != null) {
+    if (fontsize.v !== null) {
         fontsize = Sk.ffi.remapToJs(fontsize);
     } else {
         fontsize = 10;
