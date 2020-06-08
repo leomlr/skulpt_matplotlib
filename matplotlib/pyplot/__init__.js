@@ -2831,53 +2831,59 @@ var $builtinmodule = function(name) {
   var bar_f = function(left, height, width, color, edgecolor, align, bottom, alpha) {
     Sk.builtin.pyCheckArgs("bar", arguments, 0, 8, false);
 
-    if (left == null || Sk.builtin.checkNone(left)) {
+    if (left.v == null || Sk.builtin.checkNone(left)) {
         throw new Sk.builtin.ValueError("missing 1 required positional argument: 'left'");
     }
 
-    if (height == null || Sk.builtin.checkNone(height)) {
+    if (height.v == null || Sk.builtin.checkNone(height)) {
         throw new Sk.builtin.ValueError("missing 1 required positional argument: 'height'");
     }
 
-    if (color != null && !Sk.builtin.checkString(color)) {
+    if (color.v != null) {
+      if (!Sk.builtin.checkString(color)) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(color) + "' is not supported for color.");
-    }
-    if (color != null) {
+      } else {
         color = Sk.ffi.remapToJs(color);
+      }
     } else {
-        color = "blue";
+      color = "blue";
     }
 
-    if (edgecolor != null && !Sk.builtin.checkString(edgecolor)) {
+    if (edgecolor.v != null) {
+      if (!Sk.builtin.checkString(edgecolor)) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(edgecolor) + "' is not supported for edgecolor.");
-    }
-    if (edgecolor != null) {
+      } else {
         edgecolor = Sk.ffi.remapToJs(edgecolor);
+      }
     } else {
-        edgecolor = "black";
+      edgecolor = "black";
     }
 
-    if (alpha != null && !Sk.builtin.checkNumber(alpha)) {
-        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(edgecolor) + "' is not supported for alpha.");
-    }
-    if (alpha != null) {
+    if (alpha.v != null) {
+      if (!Sk.builtin.checkNumber(alpha)) {
+        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(alpha) + "' is not supported for alpha.");
+      } else {
         alpha = Sk.ffi.remapToJs(alpha);
+      }
     } else {
-        alpha = 1.0;
+      alpha = 1.0;
     }
 
-    if (align == null) {
-        align = "edge";
-    } else if (Sk.builtin.checkString(align)) {
-        align = Sk.ffi.remapToJs(align);
-    } else {
+    if (align.v != null) {
+      if (!Sk.builtin.checkString(align)) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(align) + "' is not supported for align.");
+      } else {
+        align = Sk.ffi.remapToJs(align);
+      }
+    } else {
+      align = "edge";
     }
     if (align != "edge" && align != "center") {
-        throw new Sk.builtin.ValueError("align: must be 'edge' (default), 'center'");
+      throw new Sk.builtin.ValueError("align: must be 'edge' (default), 'center'");
     }
 
-    if (bottom != null && !Sk.builtin.checkNone(bottom)) {
+
+    if (bottom.v != null && !Sk.builtin.checkNone(bottom)) {
         throw new Sk.builtin.NotImplementedError("the 'bottom' parameter is currently not supported");
     }
 
@@ -2911,7 +2917,7 @@ var $builtinmodule = function(name) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(height) + "' is not supported for height.");
     }
 
-    if (width == null) {
+    if (width.v == null) {
         width = 0.8;
     } else if (Sk.builtin.checkNumber(width)) {
         width = Sk.ffi.remapToJs(width);
