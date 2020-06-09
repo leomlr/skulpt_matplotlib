@@ -219,6 +219,7 @@ var get_clipping_id = function() {
     Rebuilds partial matplotlib.Line2D functionality. Does not inherit from
     abstract Artist class. Rather more a data representation.
  **/
+
 jsplotlib.Line2D = function(xdata, ydata, linewidth, linestyle, color, marker,
   markersize, markeredgewidth, markeredgecolor, markerfacecolor,
   markerfacecoloralt, fillstyle, antialiased, dash_capstyle,
@@ -2537,13 +2538,68 @@ var $builtinmodule = function(name) {
   plot_f.co_kwargs = true;
   mod.plot = new Sk.builtin.func(plot_f);
 
+  let subplot_f = function(rows, cols, index) {
+    Sk.builtin.pyCheckArgs("subplot", arguments, 1, 3);
+
+    if (rows.v === null || !Sk.builtin.checkInt(rows)) {
+      throw new Sk.builtin.ValueError("Error 1");
+    } else {
+      rows = Sk.ffi.remapToJs(rows);
+    }
+
+    if (cols !== undefined && cols !== null) {
+      if (!Sk.builtin.checkInt(cols)) {
+        throw new Sk.builtin.ValueError("Error 2");
+      } else {
+        cols = Sk.ffi.remapToJs(cols);
+      }
+    } else {
+      cols = null;
+    }
+
+    if (index !== undefined && index !== null) {
+      if (!Sk.builtin.checkInt(cols)) {
+        throw new Sk.builtin.ValueError("Error 3");
+      } else {
+        index = Sk.ffi.remapToJs(index);
+      }
+    } else {
+      index = null;
+    }
+
+    if (index === null && cols == null) {
+      //one number
+      if (rows > 999 || rows < 111) {
+        throw new Sk.builtin.ValueError("Error 4");
+      } else {
+        index = parseInt(rows.toString()[2]);
+        cols = parseInt(rows.toString()[1]);
+        rows = parseInt(rows.toString()[0]);
+      }
+    } else {
+      if (index === null || index > 9 || index < 1) {
+        throw new Sk.builtin.ValueError("Error 5");
+      } else if (cols === null || cols > 9 || cols < 1) {
+        throw new Sk.builtin.ValueError("Error 6");
+      } else if (rows > 9 || rows < 1) {
+        throw new Sk.builtin.ValueError("Error 7");
+      }
+    }
+
+    if (index > (cols * rows)) {
+      throw new Sk.builtin.ValueError("Error 8");
+    }
+
+    //index, cols, rows
+  };
+  mod.subplot = new Sk.builtin.func(subplot_f);
+
   var show_f = function() {
     // call drawing routine
     if (plot && plot.draw) {
       plot.draw();
     } else {
-      throw new Sk.builtin.ValueError(
-        "Can not call show without any plot created.");
+      throw new Sk.builtin.ValueError("Can not call show without any plot created.");
     }
 
     var $div_canvas =  $('#' + Sk.canvas);
@@ -3381,10 +3437,13 @@ var $builtinmodule = function(name) {
   mod.gca = new Sk.builtin.func(function() {
     throw new Sk.builtin.NotImplementedError("gca is not yet implemented");
   });
+  /*
   mod.subplot = new Sk.builtin.func(function() {
     throw new Sk.builtin.NotImplementedError(
       "subplot is not yet implemented");
   });
+
+   */
   mod.subplots = new Sk.builtin.func(function() {
     throw new Sk.builtin.NotImplementedError(
       "subplots is not yet implemented");
