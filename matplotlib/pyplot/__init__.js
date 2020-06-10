@@ -1145,7 +1145,7 @@ jsplotlib.Line2D = function(xdata, ydata, linewidth, linestyle, color, marker,
   return that;
 };
 
-jsplotlib.plot = function(chart) {
+jsplotlib.plot = function(chart, rows = null, cols = null, index = null) {
   /*
     list of responsibilites
      - holds all lines
@@ -1157,7 +1157,8 @@ jsplotlib.plot = function(chart) {
 
   // store chart object and append own methods
   var that = {
-    chart: chart
+    chart: chart,
+    subplot: null
   };
 
   that.axes_colorcycle_position = 0;
@@ -1238,6 +1239,11 @@ jsplotlib.plot = function(chart) {
   };
 
   // calculate width-height-ratio
+
+  //Subplot
+  that._subplot_w = cols;
+  that._subplot_h = rows;
+  that._subplot_i = index;
 
 
   // set graph attributes
@@ -1487,6 +1493,24 @@ jsplotlib.plot = function(chart) {
     .attr("height", that._height-that._title_size);
   };
 
+  that._create_plot_group = function(plotId, meta) {
+    let sh = meta._subplot_h;
+    let sw = meta._subplot_w;
+    let si = meta._subplot_i;
+
+    if (sh === null || sw === null || si === null) {
+      sh = 1;
+      sw = 1;
+      si = 1;
+    }
+    chart.append("svg:g").attr("id", "subplot"+plotId)
+        .attr("subplot", "true")
+        .attr("sh", sh)
+        .attr("sw", sw)
+        .attr("si", si);
+    return "#subplot"+plotId;
+  }
+
   // creates axes
   that._init_common = function() {
     for (var i = 0; i < 2; i++) {
@@ -1519,6 +1543,9 @@ jsplotlib.plot = function(chart) {
 
   // resize function for the chart
   var chart_id = that.chart.attr("id");
+  that.erase_charts = function() {
+    $("#" + chart.attr("id")).empty();
+  };
   that.resize_function = function(resize_amount, direction) {
     return function() {
       var node = this;
@@ -1553,13 +1580,11 @@ jsplotlib.plot = function(chart) {
    Draws the lines. Lines are resonsible for their drawing. Here we just initialize
    the axes and the scaling.
   **/
-  that.draw = function() {
+  that.draw = function(plotId) {
     var i;
 
-    // reset the current drawing if any
-    $("#" + chart.attr("id")).empty();
-
     this._init_common(); //
+    this._plotId = plotId;
 
     this._create_clipping();
 
@@ -1584,6 +1609,19 @@ jsplotlib.plot = function(chart) {
     }
 
     this._draw_axes();
+
+    //put every elements created in group
+    console.log("here");
+    const allChildsChart = $(this.chart[0][0]).children();
+
+
+    console.log($(this.chart[0][0]));
+    this.subplot = this._create_plot_group(plotId, this);
+    for (i = 0; i < allChildsChart.length; i++) {
+      if ($(allChildsChart[i]).attr('subplot') === "true")
+        continue;
+      $(allChildsChart[i]).appendTo(this.subplot);
+    }
   };
 
   that.update = function(kwargs) {
@@ -2375,6 +2413,7 @@ var $builtinmodule = function(name) {
   var mod = {};
   var chart;
   var plot; // TODO, we should support multiple lines here
+  let plots = [];
   var canvas;
 
   // import numpy
@@ -2501,6 +2540,7 @@ var $builtinmodule = function(name) {
     // create new plot instance, should be replaced with Line2D and then added to the plot
     if (!plot) {
       plot = jsplotlib.plot(chart);
+      console.log(plot);
     }
 
     // create line objects
@@ -2539,6 +2579,7 @@ var $builtinmodule = function(name) {
   mod.plot = new Sk.builtin.func(plot_f);
 
   let subplot_f = function(rows, cols, index) {
+    //index, cols, rows
     Sk.builtin.pyCheckArgs("subplot", arguments, 1, 3);
 
     if (rows.v === null || !Sk.builtin.checkInt(rows)) {
@@ -2590,14 +2631,27 @@ var $builtinmodule = function(name) {
       throw new Sk.builtin.ValueError("Error 8");
     }
 
-    //index, cols, rows
+    create_chart();
+    if (!plot) {
+      plot = jsplotlib.plot(chart, rows, cols, index);
+    } else {
+      if (plot._subplot_h !== null) {
+        plots.push(plot);
+      }
+      plot = jsplotlib.plot(chart, rows, cols, index);
+    }
   };
   mod.subplot = new Sk.builtin.func(subplot_f);
 
   var show_f = function() {
     // call drawing routine
     if (plot && plot.draw) {
-      plot.draw();
+      plot.erase_charts(); //remove all charts in SVG div
+      plots.push(plot);
+      console.log(plots);
+      for (let i = 0; i < plots.length; i++) {
+        plots[i].draw(i);
+      }
     } else {
       throw new Sk.builtin.ValueError("Can not call show without any plot created.");
     }
