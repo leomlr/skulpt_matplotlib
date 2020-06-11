@@ -1576,6 +1576,12 @@ jsplotlib.plot = function(chart, rows = null, cols = null, index = null) {
         "width", newwidth);
     };
   };
+
+  that.scale_subplot = function(x, y, subplot) {
+    console.log("here");
+    console.log($(subplot));
+    $(subplot).css('transform', 'scale('+x+', '+y+')');
+  };
   /**
    Draws the lines. Lines are resonsible for their drawing. Here we just initialize
    the axes and the scaling.
@@ -1611,7 +1617,6 @@ jsplotlib.plot = function(chart, rows = null, cols = null, index = null) {
     this._draw_axes();
 
     //put every elements created in group
-    console.log("here");
     const allChildsChart = $(this.chart[0][0]).children();
 
 
@@ -1622,6 +1627,16 @@ jsplotlib.plot = function(chart, rows = null, cols = null, index = null) {
         continue;
       $(allChildsChart[i]).appendTo(this.subplot);
     }
+    if (this._subplot_h === null)
+      return;
+
+
+    //resize subplot
+    let scaleW = ($("#"+get_chart_id()).width() / this._subplot_w) / $("#"+get_chart_id()).width();
+    let scaleH = ($("#"+get_chart_id()).height() / this._subplot_h) / $("#"+get_chart_id()).height();
+
+    this.scale_subplot(scaleW, scaleH, this.subplot);
+
   };
 
   that.update = function(kwargs) {
@@ -1905,12 +1920,17 @@ jsplotlib.get_color = function(cs) {
 /**
  Creates the d3 svg element at the specified dom element with given width and height
 **/
-jsplotlib.make_chart = function(width, height, insert_container, insert_mode,
+jsplotlib.make_chart = function(widthPercent, height, insert_container, insert_mode,
   attributes) {
   chart_counter++;
   var DEFAULT_PADDING = 10;
   insert_container = insert_container || "body";
-  width = width - 2 * DEFAULT_PADDING || 500;
+
+  ///
+  let width = $('body').width() * (widthPercent/100);
+  ///
+
+  //width = width - 2 * DEFAULT_PADDING || 500;
   height = height - 2 * DEFAULT_PADDING || 400;
   attributes = attributes || {};
 
@@ -1931,6 +1951,7 @@ jsplotlib.make_chart = function(width, height, insert_container, insert_mode,
   chart.attr('width', width);
   chart.attr('height', height);
   chart.attr('chart_count', chart_counter);
+  chart.attr('viewBox', '10 0 '+width+' '+height);
 
   // set additional given attributes
   for (var attribute in attributes) {
@@ -2437,7 +2458,7 @@ var $builtinmodule = function(name) {
     if (!chart) {
       $('#' + Sk.canvas).empty();
       // min height and width
-      chart = jsplotlib.make_chart(550, 460, "#" + Sk.canvas);
+      chart = jsplotlib.make_chart(70, 460, "#" + Sk.canvas);
     }
   };
 
