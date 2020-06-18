@@ -254,6 +254,7 @@ jsplotlib.Line2D = function(xdata, ydata, linewidth, linestyle, color, marker,
   that._normed = false;
   that._text = null;
   that._fontsize = 10;
+  that._label = null;
 
   //kwargs
 
@@ -431,6 +432,11 @@ jsplotlib.Line2D = function(xdata, ydata, linewidth, linestyle, color, marker,
     return this;
   }
 
+  that.label = function(s) {
+    this._label = s.toString();
+    return this;
+  }
+
   /**
     Updates possible attributes provided as kwargs
   **/
@@ -520,6 +526,9 @@ jsplotlib.Line2D = function(xdata, ydata, linewidth, linestyle, color, marker,
               break;
             case 'fontsize':
               this.fontsize(val);
+              break;
+            case 'label':
+              this.label(val);
               break;
           }
         }
@@ -1170,6 +1179,7 @@ jsplotlib.plot = function(chart, rows = null, cols = null, index = null) {
   that._bars = [];
   that.text_count = 0;
   that._texts = [];
+  that._legend = null;
 
   that.add_line = function(line) {
     if (line) {
@@ -1237,6 +1247,11 @@ jsplotlib.plot = function(chart, rows = null, cols = null, index = null) {
     }
     return this;
   };
+
+  that.add_legend = function(legend) {
+    this._legend = legend;
+    return this;
+  }
 
   // calculate width-height-ratio
 
@@ -2566,7 +2581,6 @@ var $builtinmodule = function(name) {
     // create new plot instance, should be replaced with Line2D and then added to the plot
     if (!plot) {
       plot = jsplotlib.plot(chart);
-      console.log(plot);
     }
 
     // create line objects
@@ -2968,9 +2982,10 @@ var $builtinmodule = function(name) {
   mod.grid = new Sk.builtin.func(grid_f);
 
   // bar function
-  var bar_f = function(left, height, width, color, edgecolor, align, bottom, alpha) {
-    Sk.builtin.pyCheckArgs("bar", arguments, 0, 8, false);
+  var bar_f = function(left, height, width, color, edgecolor, align, bottom, alpha, label) {
+    Sk.builtin.pyCheckArgs("bar", arguments, 0, 9, false);
 
+    console.log(label);
     if (left.v == null || Sk.builtin.checkNone(left)) {
         throw new Sk.builtin.ValueError("missing 1 required positional argument: 'left'");
     }
@@ -3025,6 +3040,15 @@ var $builtinmodule = function(name) {
 
     if (bottom.v != null && !Sk.builtin.checkNone(bottom)) {
         throw new Sk.builtin.NotImplementedError("the 'bottom' parameter is currently not supported");
+    }
+
+    if (label.v != null) {
+      if (!Sk.builtin.checkString(label) && !Sk.builtin.checkNumber(label)) {
+        throw new Sk.builtin.ValueError("the 'label' parameter must be a string or integer.");
+      }
+      label = Sk.ffi.remapToJs(label);
+    } else {
+      label = null;
     }
 
     if (Sk.builtin.checkSequence(left)) {
@@ -3088,21 +3112,22 @@ var $builtinmodule = function(name) {
             "color":           color,
             "markeredgecolor": edgecolor,
             "drawstyle":       align,
-            "alpha":           alpha
+            "alpha":           alpha,
+          "label":  label
         });
         plot.add_bar(bar);
     }
   };
 
-  bar_f.co_varnames=["left","height","width","color","edgecolor","align","bottom","alpha"];
+  bar_f.co_varnames=["left","height","width","color","edgecolor","align","bottom","alpha","label"];
   bar_f.$defaults = [Sk.builtin.none.none$,Sk.builtin.none.none$,Sk.builtin.none.none$,
                      Sk.builtin.none.none$,Sk.builtin.none.none$,Sk.builtin.none.none$,
-                     Sk.builtin.none.none$,Sk.builtin.none.none$];
+                     Sk.builtin.none.none$,Sk.builtin.none.none$,Sk.builtin.none.none$];
   mod.bar = new Sk.builtin.func(bar_f);
 
   // hist function
-  var hist_f = function(x, bins, normed, color, edgecolor, align, alpha) {
-    Sk.builtin.pyCheckArgs("hist", arguments, 0, 7, false);
+  var hist_f = function(x, bins, normed, color, edgecolor, align, alpha, label) {
+    Sk.builtin.pyCheckArgs("hist", arguments, 0, 8, false);
 
     if (x.v === null || Sk.builtin.checkNone(x)) {
       throw new Sk.builtin.ValueError("missing 1 required positional argument: 'x'");
@@ -3171,6 +3196,15 @@ var $builtinmodule = function(name) {
         throw new Sk.builtin.ValueError("align: must be 'edge', 'center' (default)");
     }
 
+    if (label.v != null) {
+      if (!Sk.builtin.checkString(label) && !Sk.builtin.checkNumber(label)) {
+        throw new Sk.builtin.ValueError("the 'label' parameter must be a string or integer.");
+      }
+      label = Sk.ffi.remapToJs(label);
+    } else {
+      label = null;
+    }
+
     if (Sk.builtin.checkSequence(x)) {
         x = Sk.ffi.remapToJs(x);
     } else if (Sk.abstr.typeName(x) === CLASS_NDARRAY) {
@@ -3199,22 +3233,23 @@ var $builtinmodule = function(name) {
             "color":           color,
             "markeredgecolor": edgecolor,
             "drawstyle":       align,
-            "alpha":           alpha
+            "alpha":           alpha,
+          "label":  label
         });
         plot.add_hist(hist);
     }
     return Sk.ffi.remapToPy([hist._y, hist._x, null]);
   };
 
-  hist_f.co_varnames=["x","bins","normed","color","edgecolor","align","alpha"];
+  hist_f.co_varnames=["x","bins","normed","color","edgecolor","align","alpha","label"];
   hist_f.$defaults = [Sk.builtin.none.none$,Sk.builtin.none.none$,Sk.builtin.none.none$,
                       Sk.builtin.none.none$,Sk.builtin.none.none$,Sk.builtin.none.none$,
-                      Sk.builtin.none.none$];
+                      Sk.builtin.none.none$,Sk.builtin.none.none$];
   mod.hist = new Sk.builtin.func(hist_f);
 
   // scatter function
-  var scatter_f = function(x, y, s, c, color, alpha) {
-    Sk.builtin.pyCheckArgs("scatter", arguments, 0, 6, false);
+  var scatter_f = function(x, y, s, c, color, alpha, label) {
+    Sk.builtin.pyCheckArgs("scatter", arguments, 0, 7, false);
 
     if (x.v === null || Sk.builtin.checkNone(x)) {
         throw new Sk.builtin.ValueError("missing 1 required positional argument: 'x'");
@@ -3233,6 +3268,7 @@ var $builtinmodule = function(name) {
         c = "blue";
     }
 
+
     if (color.v !== null && !Sk.builtin.checkString(color)) {
         throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(color) + "' is not supported for color.");
     }
@@ -3249,6 +3285,15 @@ var $builtinmodule = function(name) {
         alpha = Sk.ffi.remapToJs(alpha);
     } else {
         alpha = 1.0;
+    }
+
+    if (label.v != null) {
+      if (!Sk.builtin.checkString(label) && !Sk.builtin.checkNumber(label)) {
+        throw new Sk.builtin.ValueError("the 'label' parameter must be a string or integer.");
+      }
+      label = Sk.ffi.remapToJs(label);
+    } else {
+      label = null;
     }
 
     if (Sk.builtin.checkSequence(x)) {
@@ -3313,15 +3358,17 @@ var $builtinmodule = function(name) {
             "marker":          "s",
             "markersize":      s,
             "markeredgecolor": c,
-            "alpha":           alpha
+            "alpha":           alpha,
+          "label":  label
         });
         plot.add_scatter(scatter);
     }
   };
 
-  scatter_f.co_varnames=["x","y","s","c","color","alpha"];
+  scatter_f.co_varnames=["x","y","s","c","color","alpha","label"];
   scatter_f.$defaults = [Sk.builtin.none.none$,Sk.builtin.none.none$,Sk.builtin.none.none$,
-                     Sk.builtin.none.none$,Sk.builtin.none.none$,Sk.builtin.none.none$];
+                     Sk.builtin.none.none$,Sk.builtin.none.none$,Sk.builtin.none.none$,
+                      Sk.builtin.none.none$];
   mod.scatter = new Sk.builtin.func(scatter_f);
 
   // text function
