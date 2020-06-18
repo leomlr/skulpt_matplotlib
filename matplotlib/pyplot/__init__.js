@@ -1577,10 +1577,8 @@ jsplotlib.plot = function(chart, rows = null, cols = null, index = null) {
     };
   };
 
-  that.scale_subplot = function(x, y, subplot) {
-    console.log("here");
-    console.log($(subplot));
-    $(subplot).css('transform', 'scale('+x+', '+y+')');
+  that.scale_subplot = function(x, y, posX, posY, subplot) {
+    $(subplot).css('transform', 'translate('+posX+'px, '+posY+'px) scale('+x+', '+y+')');
   };
   /**
    Draws the lines. Lines are resonsible for their drawing. Here we just initialize
@@ -1635,8 +1633,15 @@ jsplotlib.plot = function(chart, rows = null, cols = null, index = null) {
     let scaleW = ($("#"+get_chart_id()).width() / this._subplot_w) / $("#"+get_chart_id()).width();
     let scaleH = ($("#"+get_chart_id()).height() / this._subplot_h) / $("#"+get_chart_id()).height();
 
-    this.scale_subplot(scaleW, scaleH, this.subplot);
-
+    let posY = (Math.ceil(this._subplot_i/this._subplot_h) - 1)
+        * $("#"+get_chart_id()).height() * scaleH;
+    let posX = (this._subplot_i % this._subplot_w) - 1;
+    if (posX < 0) {
+      posX = (this._subplot_w - 1) * $("#"+get_chart_id()).width() * scaleW;
+    } else {
+      posX *= ($("#" + get_chart_id()).width() * scaleW)
+    }
+    this.scale_subplot(scaleW, scaleH, posX, posY, this.subplot);
   };
 
   that.update = function(kwargs) {
@@ -1951,7 +1956,7 @@ jsplotlib.make_chart = function(widthPercent, height, insert_container, insert_m
   chart.attr('width', width);
   chart.attr('height', height);
   chart.attr('chart_count', chart_counter);
-  chart.attr('viewBox', '10 0 '+width+' '+height);
+  chart.attr('viewBox', '0 0 '+width+' '+height);
 
   // set additional given attributes
   for (var attribute in attributes) {
