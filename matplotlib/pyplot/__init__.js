@@ -1759,6 +1759,20 @@ jsplotlib.colors = {
   'w': 'white'
 };
 
+jsplotlib.position = [
+    "best",
+    "upper right",
+    "upper left",
+    "lower left",
+    "lower right",
+    "right",
+    "center left",
+    "center right",
+    "lower center",
+    "upper center",
+    "center"
+]
+
 /**
  Mapping of all possible CSS colors, that are supported by matplotlib
 **/
@@ -3376,66 +3390,96 @@ var $builtinmodule = function(name) {
     Sk.builtin.pyCheckArgs("text", arguments, 3, 5, false);
 
     if (x.v === null || Sk.builtin.checkNone(x)) {
-        throw new Sk.builtin.ValueError("missing 1 required positional argument: 'x'");
+      throw new Sk.builtin.ValueError("missing 1 required positional argument: 'x'");
     }
     if (Sk.builtin.checkNumber(x)) {
-        x = Sk.ffi.remapToJs(x);
+      x = Sk.ffi.remapToJs(x);
     } else {
-        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(x) + "' is not supported for x.");
+      throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(x) + "' is not supported for x.");
     }
     if (y.v === null || Sk.builtin.checkNone(y)) {
-        throw new Sk.builtin.ValueError("missing 1 required positional argument: 'y'");
+      throw new Sk.builtin.ValueError("missing 1 required positional argument: 'y'");
     }
     if (Sk.builtin.checkNumber(y)) {
-        y = Sk.ffi.remapToJs(y);
+      y = Sk.ffi.remapToJs(y);
     } else {
-        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(y) + "' is not supported for y.");
+      throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(y) + "' is not supported for y.");
     }
     if (s.v === null || Sk.builtin.checkNone(s)) {
-        throw new Sk.builtin.ValueError("missing 1 required positional argument: 's'");
+      throw new Sk.builtin.ValueError("missing 1 required positional argument: 's'");
     }
     if (Sk.builtin.checkString(s)) {
-        s = Sk.ffi.remapToJs(s);
+      s = Sk.ffi.remapToJs(s);
     } else {
-        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(s) + "' is not supported for s.");
+      throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(s) + "' is not supported for s.");
     }
     if (color.v !== null && !Sk.builtin.checkString(color)) {
-        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(color) + "' is not supported for 'color'.");
+      throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(color) + "' is not supported for 'color'.");
     }
     if (color.v !== null) {
-        color = Sk.ffi.remapToJs(color);
+      color = Sk.ffi.remapToJs(color);
     } else {
-        color = "black";
+      color = "black";
     }
     if (fontsize.v !== null && !Sk.builtin.checkNumber(fontsize)) {
-        throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(fontsize) + "' is not supported for 'fontsize'.");
+      throw new Sk.builtin.TypeError("'" + Sk.abstr.typeName(fontsize) + "' is not supported for 'fontsize'.");
     }
     if (fontsize.v !== null) {
-        fontsize = Sk.ffi.remapToJs(fontsize);
+      fontsize = Sk.ffi.remapToJs(fontsize);
     } else {
-        fontsize = 10;
+      fontsize = 10;
     }
 
     create_chart();
     if (!plot) {
-        plot = jsplotlib.plot(chart);
+      plot = jsplotlib.plot(chart);
     }
     if (plot) {
-        text = new jsplotlib.Line2D([x],[y]);
-        text.update({
-            "graphtype": "text",
-            "text": [s],
-            "color": color,
-            "fontsize": fontsize
-        });
-        plot.add_text(text);
+      text = new jsplotlib.Line2D([x],[y]);
+      text.update({
+        "graphtype": "text",
+        "text": [s],
+        "color": color,
+        "fontsize": fontsize
+      });
+      plot.add_text(text);
     }
   };
 
   text_f.co_varnames = ["x","y","s","color","fontsize"];
   text_f.$defaults = [Sk.builtin.none.none$, Sk.builtin.none.none$, Sk.builtin.none.none$,
-                      Sk.builtin.none.none$, Sk.builtin.none.none$];
+    Sk.builtin.none.none$, Sk.builtin.none.none$];
   mod.text = new Sk.builtin.func(text_f);
+
+  //legend function
+  var legend_f = function(loc) {
+    Sk.builtin.pyCheckArgs("legend", arguments, 0, 1, false);
+
+    if (loc.v !== null) {
+      if (!Sk.builtin.checkString(loc)) {
+        throw new Sk.builtin.TypeError("loc must be a string.");
+      } else {
+        if (jsplotlib.position.indexOf(loc.v) === -1)
+          throw new Sk.builtin.TypeError("this value of loc is invalid");
+        else
+          loc = Sk.ffi.remapToJs(loc);
+      }
+    } else {
+      loc = "upper center";
+    }
+
+    create_chart();
+    if (!plot) {
+      plot = jsplotlib.plot(chart);
+    }
+    if (plot) {
+      plot.add_legend(loc);
+    }
+  };
+
+  legend_f.co_varnames = ["loc"];
+  legend_f.$defaults = [Sk.builtin.none.none$];
+  mod.legend = new Sk.builtin.func(legend_f);
 
 
   /* list of not implemented methods */
@@ -3873,10 +3917,6 @@ var $builtinmodule = function(name) {
   });
   mod.cla = new Sk.builtin.func(function() {
     throw new Sk.builtin.NotImplementedError("cla is not yet implemented");
-  });
-  mod.legend = new Sk.builtin.func(function() {
-    throw new Sk.builtin.NotImplementedError(
-      "legend is not yet implemented");
   });
   mod.table = new Sk.builtin.func(function() {
     throw new Sk.builtin.NotImplementedError(
