@@ -1,13 +1,14 @@
-# Matplotlib Pyplot for Skulpt
+# Matplotlib Pyplot for Skulpt - Vittascience Edition
 
 This library provides a small set of pyplot functions for plotting point and lines
 graphs.
 
-
-Latest Changes:
-- Fixed figure auto ratio calculation
-- Added missing ```plot(x1, y1, ftm1, x2, y2, fmt2)``` support
-
+Lastest Changes:
+- Add subplot function (up to 9x9 grid)
 
 Function overview:
-*comming soon*
+- Legend
+- LimX
+- LimY
+
+Special Thanks to @Diraison on GitHub for his works on MatPlotLib skulpt.
