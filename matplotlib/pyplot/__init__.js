@@ -1559,38 +1559,81 @@ jsplotlib.plot = function(chart, rows = null, cols = null, index = null) {
     return this;
   };
 
+  that._render_legend_position = function(g) {
+    console.log(that._chartwidth); //x 100%
+    console.log(that._chartheight); //y 100%
+    console.log(g);
+
+    const xPadding = 0.15;
+    const yPadding = 0.15;
+    let x = 0;
+    let y = 0;
+
+    /*
+    "upper right",
+    "upper left",
+    "lower left",
+    "lower right",
+    "center left",
+    "center right",
+    "lower center",
+    "upper center",
+    "center"
+     */
+    switch (that._legend) {
+      case "upper right":
+        x = that._chartwidth - (that._chartwidth * xPadding);
+        y = that._chartheight * yPadding;
+        break;
+      case "upper left":
+        x = that._chartwidth * xPadding;
+        y = that._chartheight * yPadding;
+        break;
+      case "lower left":
+        x = that._chartwidth * xPadding;
+        y = that._chartheight - (that._chartheight * yPadding);
+        break;
+      case "lower right":
+        x = that._chartwidth - (that._chartwidth * xPadding);
+        y = that._chartheight - (that._chartheight * yPadding);
+        break;
+      case "center left":
+        x = that._chartwidth * xPadding;
+        y = that._chartheight / 2;
+        break;
+      case "center right":
+        x = that._chartwidth - (that._chartwidth * xPadding);
+        y = that._chartheight / 2;
+        break;
+      case "lower center":
+        x = that._chartwidth / 2;
+        y = that._chartheight - (that._chartheight * yPadding);
+        break;
+      case "upper center":
+        x = that._chartwidth / 2;
+        y = that._chartheight * yPadding;
+        break;
+      default:
+        x = 0;
+        y = 0;
+    }
+    g.style("transform", "translate("+x+"px, "+y+"px)");
+  }
+
   that._render_legend = function(allLabels) {
-    console.log(allLabels);
-    let x = 200;
-    let y = 130;
+    let y = 0;
+
+    let g = chart.append("svg:g").attr("id", "legend_"+this._plotId);
+    //chart.append("svg:g").attr("id", this._id)
 
     for (let i = 0; i < allLabels.length; i++) {
-      chart.append("circle").attr("cx",x).attr("cy",y).attr("r", 6).style("fill", allLabels[i].color);
-      chart.append("text").attr("x", (x + 20)).attr("y", y).text(allLabels[i].label).style("font-size", "15px").attr("alignment-baseline","middle");
+      g.append("circle").attr("cx",0).attr("cy",y).attr("r", 6).style("fill", allLabels[i].color);
+      g.append("text").attr("x", 20).attr("y", y).text(allLabels[i].label).style("font-size", "15px").attr("alignment-baseline","middle");
       y += 30;
     }
 
-    /*
-
-      allLabels.push({
-        type: "line",
-        color: that._lines[i]._color,
-        label: that._lines[i]._label
-      });
-
-        let x = 200;
-        let y = 130;
-        if (that._legend !== null) {
-          for (let i = 0; i < that._lines.length; i++) {
-            if (that._lines[i]._label === null)
-              continue;
-            chart.append("circle").attr("cx",x).attr("cy",y).attr("r", 6).style("fill", "#69b3a2")
-            chart.append("text").attr("x", (x + 20)).attr("y", y).text(that._lines[i]._label).style("font-size", "15px").attr("alignment-baseline","middle")
-            y += 30;
-          }
-        }
-
-     */
+    //Position Render
+    that._render_legend_position(g);
   }
 
   // draw legend
@@ -1839,12 +1882,10 @@ jsplotlib.colors = {
 };
 
 jsplotlib.position = [
-    "best",
     "upper right",
     "upper left",
     "lower left",
     "lower right",
-    "right",
     "center left",
     "center right",
     "lower center",
