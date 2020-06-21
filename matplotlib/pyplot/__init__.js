@@ -1613,6 +1613,10 @@ jsplotlib.plot = function(chart, rows = null, cols = null, index = null) {
         x = that._chartwidth / 2;
         y = that._chartheight * yPadding;
         break;
+      case "center":
+        x = that._chartwidth / 2;
+        y = that._chartheight / 2;
+        break;
       default:
         x = 0;
         y = 0;
