@@ -433,7 +433,10 @@ jsplotlib.Line2D = function(xdata, ydata, linewidth, linestyle, color, marker,
   }
 
   that.label = function(s) {
-    this._label = s.toString();
+    if (s === null)
+      this._label = null;
+    else
+      this._label = s.toString();
     return this;
   }
 
@@ -1556,6 +1559,81 @@ jsplotlib.plot = function(chart, rows = null, cols = null, index = null) {
     return this;
   };
 
+  that._render_legend = function(allLabels) {
+    console.log(allLabels);
+    let x = 200;
+    let y = 130;
+
+    for (let i = 0; i < allLabels.length; i++) {
+      chart.append("circle").attr("cx",x).attr("cy",y).attr("r", 6).style("fill", allLabels[i].color);
+      chart.append("text").attr("x", (x + 20)).attr("y", y).text(allLabels[i].label).style("font-size", "15px").attr("alignment-baseline","middle");
+      y += 30;
+    }
+
+    /*
+
+      allLabels.push({
+        type: "line",
+        color: that._lines[i]._color,
+        label: that._lines[i]._label
+      });
+
+        let x = 200;
+        let y = 130;
+        if (that._legend !== null) {
+          for (let i = 0; i < that._lines.length; i++) {
+            if (that._lines[i]._label === null)
+              continue;
+            chart.append("circle").attr("cx",x).attr("cy",y).attr("r", 6).style("fill", "#69b3a2")
+            chart.append("text").attr("x", (x + 20)).attr("y", y).text(that._lines[i]._label).style("font-size", "15px").attr("alignment-baseline","middle")
+            y += 30;
+          }
+        }
+
+     */
+  }
+
+  // draw legend
+  that._draw_legend = function() {
+    if (that._legend === null)
+      return ;
+    let allLabels = [];
+
+    /* Get all labels from line */
+    for (let i = 0; i < that._lines.length; i++) {
+      if (that._lines[i]._label === null)
+        continue;
+      allLabels.push({
+        type: "line",
+        color: that._lines[i]._color,
+        label: that._lines[i]._label
+      });
+    }
+    /* Get all labels from scatter */
+    for (let i = 0; i < that._scatters.length; i++) {
+      if (that._scatters[i]._label === null)
+        continue;
+      allLabels.push({
+        type: "scatter",
+        color: that._scatters[i]._color,
+        label: that._scatters[i]._label
+      });
+    }
+
+    /* Get all labels from bar and hist */
+    for (let i = 0; i < that._bars.length; i++) {
+      if (that._bars[i]._label === null)
+        continue;
+      allLabels.push({
+        type: "bar",
+        color: that._bars[i]._color,
+        label: that._bars[i]._label
+      });
+    }
+
+    that._render_legend(allLabels);
+  };
+
   // resize function for the chart
   var chart_id = that.chart.attr("id");
   that.erase_charts = function() {
@@ -1628,6 +1706,7 @@ jsplotlib.plot = function(chart, rows = null, cols = null, index = null) {
     }
 
     this._draw_axes();
+    this._draw_legend();
 
     //put every elements created in group
     const allChildsChart = $(this.chart[0][0]).children();
@@ -3301,7 +3380,8 @@ var $builtinmodule = function(name) {
         alpha = 1.0;
     }
 
-    if (label.v != null) {
+    console.log(label);
+    if (label.v !== null) {
       if (!Sk.builtin.checkString(label) && !Sk.builtin.checkNumber(label)) {
         throw new Sk.builtin.ValueError("the 'label' parameter must be a string or integer.");
       }
