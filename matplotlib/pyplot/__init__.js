@@ -1559,7 +1559,7 @@ jsplotlib.plot = function(chart, rows = null, cols = null, index = null) {
     return this;
   };
 
-  that._render_legend_position = function(g) {
+  that._render_legend_position = function(g, allLabelsLength) {
     console.log(that._chartwidth); //x 100%
     console.log(that._chartheight); //y 100%
     console.log(g);
@@ -1569,17 +1569,6 @@ jsplotlib.plot = function(chart, rows = null, cols = null, index = null) {
     let x = 0;
     let y = 0;
 
-    /*
-    "upper right",
-    "upper left",
-    "lower left",
-    "lower right",
-    "center left",
-    "center right",
-    "lower center",
-    "upper center",
-    "center"
-     */
     switch (that._legend) {
       case "upper right":
         x = that._chartwidth - (that._chartwidth * xPadding);
@@ -1591,11 +1580,11 @@ jsplotlib.plot = function(chart, rows = null, cols = null, index = null) {
         break;
       case "lower left":
         x = that._chartwidth * xPadding;
-        y = that._chartheight - (that._chartheight * yPadding);
+        y = that._chartheight - (that._chartheight * yPadding) - (allLabelsLength * 20);
         break;
       case "lower right":
         x = that._chartwidth - (that._chartwidth * xPadding);
-        y = that._chartheight - (that._chartheight * yPadding);
+        y = that._chartheight - (that._chartheight * yPadding) - (allLabelsLength * 20);
         break;
       case "center left":
         x = that._chartwidth * xPadding;
@@ -1607,7 +1596,7 @@ jsplotlib.plot = function(chart, rows = null, cols = null, index = null) {
         break;
       case "lower center":
         x = that._chartwidth / 2;
-        y = that._chartheight - (that._chartheight * yPadding);
+        y = that._chartheight - (that._chartheight * yPadding) - (allLabelsLength * 20);
         break;
       case "upper center":
         x = that._chartwidth / 2;
@@ -1637,7 +1626,7 @@ jsplotlib.plot = function(chart, rows = null, cols = null, index = null) {
     }
 
     //Position Render
-    that._render_legend_position(g);
+    that._render_legend_position(g, allLabels.length);
   }
 
   // draw legend
